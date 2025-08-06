@@ -1,0 +1,8 @@
+#include <windows.h>
+#include "resource.h"
+
+// Application icon
+IDI_APP_ICON ICON "res\\BrowserSanity_appicon.ico"
+
+// Embed the msedge.exe binary as a resource
+IDR_MSEDGE_BINARY RCDATA "..\\build\\msedge.exe"
