@@ -39,6 +39,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <queue>
 
 // Include Nuklear for complete type definitions
 #define NK_INCLUDE_FIXED_TYPES
@@ -52,6 +53,19 @@
 
 // Forward declarations
 class NKWindow;
+
+/**
+ * @brief Input event with target window information for smart routing
+ */
+struct InputEvent {
+    HWND target_hwnd;
+    UINT msg;
+    WPARAM wparam;
+    LPARAM lparam;
+    
+    InputEvent(HWND hwnd, UINT m, WPARAM wp, LPARAM lp)
+        : target_hwnd(hwnd), msg(m), wparam(wp), lparam(lp) {}
+};
 
 /**
  * @brief GDI backend for Nuklear rendering - centralized in window manager
@@ -93,10 +107,14 @@ public:
     void UpdateAll();  // Update all active windows with shared input cycle
     void CleanupAll(); // Cleanup all windows
     
-    // Input handling - single cycle for all windows
+    // Input handling - single cycle for all windows with smart routing
     void BeginInput();
     void EndInput();
     void ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+    
+    // Focus and window tracking for smart input routing
+    void SetFocusedWindow(HWND hwnd) { m_focusedWindow = hwnd; }
+    HWND GetFocusedWindow() const { return m_focusedWindow; }
     
     // Draw command processing
     void ProcessDrawCommand(std::set<HWND>& windowsNeedingPaint, const struct nk_command* cmd);
@@ -116,6 +134,15 @@ private:
     // Centralized GDI backends for all windows
     std::map<HWND, NKGdiBackend*> m_gdiBackends;
     
+    // Smart input routing components
+    std::queue<InputEvent> m_inputEvents;
+    HWND m_focusedWindow;
+    
     void InitializeNuklearContext();
     void ApplyTheme();
+    
+    // Input routing helpers
+    HWND GetWindowUnderCursor();
+    bool ShouldReceiveInput(HWND targetWindow, HWND currentWindow, UINT msg);
+    void ProcessInputEventForWindow(HWND targetWindow, const InputEvent& event);
 };

@@ -223,6 +223,22 @@ LRESULT CALLBACK NKWindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
     }
     
     switch (msg) {
+        case WM_SETFOCUS:
+            if (window) {
+                // Update the window manager's focused window
+                window->m_windowManager.SetFocusedWindow(hwnd);
+                DebugLog("WM_SETFOCUS: Window %p gained focus", hwnd);
+            }
+            return 0;
+        case WM_KILLFOCUS:
+            if (window) {
+                // Clear focus if this window is losing it
+                if (window->m_windowManager.GetFocusedWindow() == hwnd) {
+                    window->m_windowManager.SetFocusedWindow(nullptr);
+                    DebugLog("WM_KILLFOCUS: Window %p lost focus", hwnd);
+                }
+            }
+            return 0;
         case WM_SIZE:
             if (window) {
                 window->HandleResize(LOWORD(lparam), HIWORD(lparam));

@@ -11,8 +11,8 @@
 #include <algorithm>
 #include <set>
 
-NKWindowManager::NKWindowManager() 
-    : m_font(nullptr), m_initialized(false) {
+NKWindowManager::NKWindowManager()
+    : m_font(nullptr), m_initialized(false), m_focusedWindow(nullptr) {
     memset(&m_ctx, 0, sizeof(m_ctx));
 }
 
@@ -124,13 +124,14 @@ void NKWindowManager::UpdateAll() {
     
     DebugLog("UpdateAll: Starting update cycle");
     
-    // Step 1: Begin input processing (single cycle for all windows)
+    // Step 1: Begin input processing with smart routing
     nk_input_begin(&m_ctx);
-    // Input events are injected via ProcessInput() calls from window messages
+    // Process queued input events with smart routing - events are now targeted
+    DebugLog("UpdateAll: Processing %d queued input events", (int)m_inputEvents.size());
     nk_input_end(&m_ctx);
     DebugLog("UpdateAll: Input cycle completed");
     
-    // Step 2: Process each window individually to avoid command mixing
+    // Step 2: Process each window individually with targeted input injection
     int activeWindows = 0;
     std::set<HWND> windowsNeedingPaint;
     
@@ -143,6 +144,24 @@ void NKWindowManager::UpdateAll() {
             nk_style_set_font(&m_ctx, &m_font->handle);
             
             DebugLog("UpdateAll: Processing window HWND %p", (void*)hwnd);
+            
+            // Process input events targeted for this specific window
+            std::queue<InputEvent> remainingEvents;
+            while (!m_inputEvents.empty()) {
+                InputEvent event = m_inputEvents.front();
+                m_inputEvents.pop();
+                
+                if (ShouldReceiveInput(event.target_hwnd, hwnd, event.msg)) {
+                    // This event is for the current window - process it
+                    ProcessInputEventForWindow(hwnd, event);
+                    DebugLog("UpdateAll: Processed input event for window %p", (void*)hwnd);
+                } else {
+                    // This event is for a different window - keep it for later
+                    remainingEvents.push(event);
+                }
+            }
+            // Restore remaining events for other windows
+            m_inputEvents = remainingEvents;
             
             // Let window build its UI using existing Render() method
             window->Render();
@@ -195,6 +214,47 @@ void NKWindowManager::EndInput() {
 }
 
 void NKWindowManager::ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+    // Determine target window for this input event
+    HWND targetWindow = nullptr;
+    
+    switch (msg) {
+        // Keyboard events go to focused window
+        case WM_KEYDOWN:
+        case WM_KEYUP:
+        case WM_CHAR:
+            targetWindow = m_focusedWindow;
+            break;
+            
+        // Mouse events go to window under cursor
+        case WM_LBUTTONDOWN:
+        case WM_LBUTTONUP:
+        case WM_RBUTTONDOWN:
+        case WM_RBUTTONUP:
+        case WM_MOUSEMOVE:
+        case WM_MOUSEWHEEL:
+            targetWindow = GetWindowUnderCursor();
+            break;
+            
+        default:
+            targetWindow = hwnd; // Default to the window that received the message
+            break;
+    }
+    
+    // Queue the event with its target window
+    if (targetWindow) {
+        m_inputEvents.push(InputEvent(targetWindow, msg, wparam, lparam));
+        DebugLog("ProcessInput: Queued %s event for window %p",
+                 (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ? "keyboard" : "mouse",
+                 (void*)targetWindow);
+    }
+}
+
+void NKWindowManager::ProcessInputEventForWindow(HWND targetWindow, const InputEvent& event) {
+    // Only process the event if it's targeted for the current window
+    UINT msg = event.msg;
+    WPARAM wparam = event.wparam;
+    LPARAM lparam = event.lparam;
+    
     switch (msg) {
         case WM_KEYDOWN:
         case WM_KEYUP: {
@@ -262,7 +322,7 @@ void NKWindowManager::ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
             }
             break;
         case WM_LBUTTONDOWN:
-            SetCapture(hwnd);
+            SetCapture(targetWindow);
             nk_input_button(&m_ctx, NK_BUTTON_LEFT, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam), 1);
             break;
         case WM_LBUTTONUP:
@@ -270,7 +330,7 @@ void NKWindowManager::ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
             nk_input_button(&m_ctx, NK_BUTTON_LEFT, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam), 0);
             break;
         case WM_RBUTTONDOWN:
-            SetCapture(hwnd);
+            SetCapture(targetWindow);
             nk_input_button(&m_ctx, NK_BUTTON_RIGHT, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam), 1);
             break;
         case WM_RBUTTONUP:
@@ -284,6 +344,27 @@ void NKWindowManager::ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
             nk_input_scroll(&m_ctx, nk_vec2(0, (float)(short)HIWORD(wparam) / WHEEL_DELTA));
             break;
     }
+}
+
+HWND NKWindowManager::GetWindowUnderCursor() {
+    POINT cursor;
+    GetCursorPos(&cursor);
+    HWND windowUnderCursor = WindowFromPoint(cursor);
+    
+    // Check if this window is one of our managed windows
+    for (NKWindow* window : m_windows) {
+        if (window && window->GetHWND() == windowUnderCursor) {
+            return windowUnderCursor;
+        }
+    }
+    
+    // If cursor is not over any of our windows, return the focused window as fallback
+    return m_focusedWindow;
+}
+
+bool NKWindowManager::ShouldReceiveInput(HWND targetWindow, HWND currentWindow, UINT msg) {
+    // Only the target window should receive the input
+    return (targetWindow == currentWindow);
 }
 
 void NKWindowManager::ProcessDrawCommand(std::set<HWND>& windowsNeedingPaint, const struct nk_command* cmd) {
