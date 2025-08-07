@@ -214,4 +214,12 @@ int ShowMainSettingsDialog(HWND hwndParent);
  */
 int ShowInstallUninstallProgressDialog(HWND hwndParent, BOOL isInstall);
 
+/**
+ * @brief Shows the installation information dialog when Browser Sanity is not found
+ *
+ * @param hwndParent Parent window handle
+ * @return Dialog result (IDYES = Install, IDNO = Cancel)
+ */
+int ShowInstallationInfoDialog(HWND hwndParent);
+
 #endif /* BROWSER_SANITY_H */

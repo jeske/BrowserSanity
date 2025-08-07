@@ -4,9 +4,12 @@
 This is the very first prompt I used to kick off this project. I am preserving it here, 
 both for posterity, and for the purpose of helping others understand a bit how I construct
 prompts for the AI. There was lots more than this that went into getting the app done
-but the first release did only take <4 hours with the help of the AI. Which is pretty astounding.
-And probably it could have taken alot less if I spent a little more time in the design phase
-to give it a better initial plan. Enjoy. - David Jeske
+but the first release did only take a single day with the help of the AI. Which is pretty
+astounding, especially considering it IS the installer/uninstaller/daemon/UI/and tool.
+It would have taken less time if I spent a little more time in the design phase, or if
+this was not my first native windows AI pair-coding attempt. 
+
+Special thanks to "The Intern" (Claude Sonnet 4) - David Jeske
 
 # Project Spec : Browser Sanity
 

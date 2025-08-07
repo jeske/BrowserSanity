@@ -53,6 +53,7 @@
     <ClCompile Include="src\browser-sanity\actions\action_resources.c" />
     <ClCompile Include="src\browser-sanity\ui\ui.c" />
     <ClCompile Include="src\browser-sanity\ui\dialog_manualLaunch.c" />
+    <ClCompile Include="src\browser-sanity\ui\dialog_manualLaunchInstall.c" />
     <ClCompile Include="src\browser-sanity\ui\dialog_mainSettings.c" />
     <ClCompile Include="src\browser-sanity\ui\dialog_installanduninstallprogress.c" />
     <ClCompile Include="src\browser-sanity\watchdog\watchdog.c" />

@@ -141,9 +141,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 
                 // Only show install dialog for BrowserSanity.exe
                 if (_stricmp(fileName, "BrowserSanity.exe") == 0) {
-                    if (MessageBox(NULL,
-                                  "Browser Sanity is not installed. Would you like to install it now?",
-                                  "Browser Sanity", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                    int result = ShowInstallationInfoDialog(NULL);
+                    if (result == IDYES) {
                         return RunInstallerAction();
                     }
                 }
