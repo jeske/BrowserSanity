@@ -170,10 +170,39 @@ BOOL SetWatchdogEnabled(BOOL enabled);
 BOOL IsProcessRunning();
 
 /**
+ * @brief Checks if Browser Sanity is currently running and gets PID
+ *
+ * @param outPID Pointer to store the PID of running process (optional, can be NULL)
+ * @return TRUE if another instance is running, FALSE otherwise
+ */
+BOOL IsProcessRunningWithPID(DWORD* outPID);
+
+/**
  * @brief Comprehensive installation check (registry, path, redirector)
  *
  * @return TRUE if Browser Sanity is properly installed, FALSE otherwise
  */
 BOOL IsComprehensivelyInstalled();
+
+// UI Dialog Functions
+
+/**
+ * @brief Shows the manual launch dialog when BrowserSanity.exe is run directly
+ *
+ * @param hwndParent Parent window handle
+ * @param isRunning Whether Browser Sanity is currently running
+ * @param isInstalled Whether Browser Sanity is installed
+ * @param runningPID Process ID if running
+ * @return Dialog result (IDYES = Show Settings, IDNO = Exit)
+ */
+int ShowManualLaunchDialog(HWND hwndParent, BOOL isRunning, BOOL isInstalled, DWORD runningPID);
+
+/**
+ * @brief Shows the main settings configuration dialog
+ *
+ * @param hwndParent Parent window handle
+ * @return Dialog result (IDOK if settings were saved, IDCANCEL if cancelled)
+ */
+int ShowMainSettingsDialog(HWND hwndParent);
 
 #endif /* BROWSER_SANITY_H */

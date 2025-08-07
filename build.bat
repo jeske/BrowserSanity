@@ -117,8 +117,8 @@ echo.
 echo Build completed successfully!
 echo.
 echo Output files:
-echo  * build\Release\msedge.exe
-echo  * build\Release\BrowserSanity.exe
+echo  * build-Release\msedge.exe
+echo  * build-Release\BrowserSanity.exe
 echo.
 
 exit /b 0

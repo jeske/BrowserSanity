@@ -22,6 +22,9 @@
 *.res
 *.aps
 
+# Personal Archive (untracked)
+Archive/
+
 # Visual Studio intermediate files
 Release/
 Debug/

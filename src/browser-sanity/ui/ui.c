@@ -91,46 +91,14 @@ BOOL InitUI(HINSTANCE hInstance, int nCmdShow) {
     // Read the configuration
     ReadAppConfig(&g_config);
     
-    // Check if Browser Sanity is already installed
-    BOOL isInstalled = IsComprehensivelyInstalled();
-    BOOL isRunning = IsProcessRunning();
-    
-    if (isInstalled) {
-        // Show the "already installed" dialog instead of the main window
-        int choice = ShowAlreadyInstalledDialog(NULL);
-        
-        switch (choice) {
-            case IDOK: // Show Settings
-                // Continue to show main window
-                break;
-            case IDYES: // Launch
-                if (!isRunning) {
-                    LaunchInstalledApplication();
-                }
-                return TRUE; // Exit without showing main window
-            case IDNO: // Uninstall
-                if (MessageBox(NULL, "Are you sure you want to uninstall Browser Sanity?",
-                              "Browser Sanity", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-                    if (UninstallApplication()) {
-                        MessageBox(NULL, "Browser Sanity has been uninstalled successfully.",
-                                  "Browser Sanity", MB_OK | MB_ICONINFORMATION);
-                    } else {
-                        MessageBox(NULL, "Failed to uninstall Browser Sanity.",
-                                  "Browser Sanity", MB_OK | MB_ICONERROR);
-                    }
-                }
-                return TRUE; // Exit without showing main window
-            case IDCANCEL:
-            default:
-                return TRUE; // Exit without showing main window
-        }
-    }
+    // Read the configuration - the logic for when to show this UI is now handled in main.c
+    // This function only shows the settings UI when explicitly called
     
     // Create the window
     hwnd = CreateWindowEx(
         0,
         WINDOW_CLASS_NAME,
-        isInstalled ? "Browser Sanity - Settings" : "Browser Sanity - Installation",
+        g_config.isInstalled ? "Browser Sanity - Settings" : "Browser Sanity - Installation",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         WINDOW_WIDTH, WINDOW_HEIGHT,

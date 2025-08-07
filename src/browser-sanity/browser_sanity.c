@@ -288,15 +288,29 @@ BOOL SetRunAtStartup(BOOL enable) {
 /**
  * @brief Checks if Browser Sanity is currently running (excluding this process)
  *
+ * @param outPID Pointer to store the PID of running process (optional, can be NULL)
  * @return TRUE if another instance is running, FALSE otherwise
  */
 BOOL IsProcessRunning() {
+    return IsProcessRunningWithPID(NULL);
+}
+
+/**
+ * @brief Checks if Browser Sanity is currently running and gets PID
+ *
+ * @param outPID Pointer to store the PID of running process (optional, can be NULL)
+ * @return TRUE if another instance is running, FALSE otherwise
+ */
+BOOL IsProcessRunningWithPID(DWORD* outPID) {
     HANDLE hSnapshot;
     PROCESSENTRY32 pe32;
     DWORD currentPID = GetCurrentProcessId();
     char currentExeName[MAX_PATH];
-    char processExeName[MAX_PATH];
     BOOL found = FALSE;
+    
+    if (outPID) {
+        *outPID = 0;
+    }
     
     // Get the current executable name
     if (GetModuleFileName(NULL, currentExeName, MAX_PATH) == 0) {
@@ -328,6 +342,9 @@ BOOL IsProcessRunning() {
             // Check if this is BrowserSanity.exe
             if (_stricmp(pe32.szExeFile, fileName) == 0) {
                 found = TRUE;
+                if (outPID) {
+                    *outPID = pe32.th32ProcessID;
+                }
                 break;
             }
             
