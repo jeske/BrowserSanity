@@ -122,73 +122,79 @@ void NKWindowManager::UpdateAll() {
         return;
     }
     
-    DebugLog("UpdateAll: Starting update cycle");
+    // DebugLog("UpdateAll: Starting update cycle");
     
-    // Step 1: Begin input processing with smart routing
-    nk_input_begin(&m_ctx);
-    // Process queued input events with smart routing - events are now targeted
-    DebugLog("UpdateAll: Processing %d queued input events", (int)m_inputEvents.size());
-    nk_input_end(&m_ctx);
-    DebugLog("UpdateAll: Input cycle completed");
+    // Step 1: Sort all input events by target window to avoid infinite loops
+    std::map<HWND, std::queue<InputEvent>> eventsByTargetWindow;
+    while (!m_inputEvents.empty()) {
+        InputEvent event = m_inputEvents.front();
+        m_inputEvents.pop();
+        eventsByTargetWindow[event.target_hwnd].push(event);
+    }
     
-    // Step 2: Process each window individually with targeted input injection
-    int activeWindows = 0;
+    // Step 2: Process each window individually with its own events
+    int activeWindowCount = 0;
     std::set<HWND> windowsNeedingPaint;
     
     for (NKWindow* window : m_windows) {
         if (window) {
-            activeWindows++;
-            HWND hwnd = window->GetHWND();
+            activeWindowCount++;
+            HWND hwndBeingProcessed = window->GetHWND();
             
             // Set font for this window
             nk_style_set_font(&m_ctx, &m_font->handle);
             
-            DebugLog("UpdateAll: Processing window HWND %p", (void*)hwnd);
+            // DebugLog("UpdateAll: Processing window HWND %p", (void*)hwndBeingProcessed);
             
-            // Process input events targeted for this specific window
-            if (window->IsActive()) {
-                std::queue<InputEvent> remainingEvents;
-                while (!m_inputEvents.empty()) {
-                    InputEvent event = m_inputEvents.front();
-                    m_inputEvents.pop();
-                    
-                    if (ShouldReceiveInput(event.target_hwnd, hwnd, event.msg)) {
-                        // This event is for the current window - process it
-                        ProcessInputEventForWindow(hwnd, event);
-                        DebugLog("UpdateAll: Processed input event for window %p", (void*)hwnd);
-                    } else {
-                        // This event is for a different window - keep it for later
-                        remainingEvents.push(event);
-                    }
-                }
-                // Restore remaining events for other windows
-                m_inputEvents = remainingEvents;
+            // Begin input processing for THIS window only
+            nk_input_begin(&m_ctx);
+            
+            // Count input events processed for this window
+            int inputEventCount = 0;
+            
+            // Process all events targeted for this specific window
+            std::queue<InputEvent>& eventsForThisWindow = eventsByTargetWindow[hwndBeingProcessed];
+            while (!eventsForThisWindow.empty()) {
+                InputEvent event = eventsForThisWindow.front();
+                eventsForThisWindow.pop();
+                ProcessInputEventForWindow(hwndBeingProcessed, event);
+                inputEventCount++;
+                // DebugLog("UpdateAll: Processed input event for window %p", (void*)hwndBeingProcessed);
             }
+            
+            // End input processing for THIS window
+            nk_input_end(&m_ctx);
+            
+            // Log the input event count for this window
+            if (inputEventCount > 0) {
+                DebugLog("INPUT COUNT: Window %p processed %d input events", (void*)hwndBeingProcessed, inputEventCount);
+            }
+            // DebugLog("UpdateAll: Input cycle completed for window %p", (void*)hwndBeingProcessed);
             
             // Let window build its UI using existing Render() method
             window->Render();
             
             // Immediately process draw commands for THIS window only
-            NKGdiBackend* backend = GetGdiBackend(hwnd);
+            NKGdiBackend* backend = GetGdiBackend(hwndBeingProcessed);
             if (backend && backend->memory_dc) {
                 // Clear the window's background
-                RECT rect = {0, 0, backend->width, backend->height};
-                HBRUSH bg_brush = CreateSolidBrush(RGB(240, 240, 240)); // Light gray background
-                FillRect(backend->memory_dc, &rect, bg_brush);
-                DeleteObject(bg_brush);
+                RECT backgroundRect = {0, 0, backend->width, backend->height};
+                HBRUSH backgroundBrush = CreateSolidBrush(RGB(240, 240, 240)); // Light gray background
+                FillRect(backend->memory_dc, &backgroundRect, backgroundBrush);
+                DeleteObject(backgroundBrush);
                 
                 // Process all draw commands for this window
-                const struct nk_command* cmd;
+                const struct nk_command* drawCommand;
                 int commandCount = 0;
-                nk_foreach(cmd, &m_ctx) {
+                nk_foreach(drawCommand, &m_ctx) {
                     commandCount++;
-                    ProcessDrawCommandForWindow(backend, cmd);
+                    ProcessDrawCommandForWindow(backend, drawCommand);
                 }
                 
-                DebugLog("UpdateAll: Processed %d commands for window HWND %p", commandCount, (void*)hwnd);
+                // DebugLog("UpdateAll: Processed %d commands for window HWND %p", commandCount, (void*)hwndBeingProcessed);
                 
                 // Mark this window as needing paint
-                windowsNeedingPaint.insert(hwnd);
+                windowsNeedingPaint.insert(hwndBeingProcessed);
             }
             
             // Clear the context after processing this window's commands
@@ -196,15 +202,15 @@ void NKWindowManager::UpdateAll() {
         }
     }
     
-    DebugLog("UpdateAll: Processed %d active windows", activeWindows);
+    // DebugLog("UpdateAll: Processed %d active windows", activeWindowCount);
     
     // Step 3: Trigger WM_PAINT for all windows that had drawing
-    for (HWND hwnd : windowsNeedingPaint) {
-        InvalidateRect(hwnd, NULL, FALSE);
-        DebugLog("UpdateAll: InvalidateRect called for HWND %p", hwnd);
+    for (HWND hwndNeedingPaint : windowsNeedingPaint) {
+        InvalidateRect(hwndNeedingPaint, NULL, FALSE);
+        // DebugLog("UpdateAll: InvalidateRect called for HWND %p", hwndNeedingPaint);
     }
     
-    DebugLog("UpdateAll: Update cycle complete");
+    // DebugLog("UpdateAll: Update cycle complete");
 }
 
 void NKWindowManager::BeginInput() {
@@ -215,47 +221,64 @@ void NKWindowManager::EndInput() {
     nk_input_end(&m_ctx);
 }
 
-void NKWindowManager::ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+void NKWindowManager::ProcessInput(HWND hwndMessageReceiver, UINT msg, WPARAM wparam, LPARAM lparam) {
     // Determine target window for this input event
-    HWND targetWindow = nullptr;
+    HWND hwndEventTarget = nullptr;
     
     switch (msg) {
-        // Keyboard events go to focused window
+        
         case WM_KEYDOWN:
         case WM_KEYUP:
         case WM_CHAR:
-            targetWindow = m_focusedWindow;
+            // Keyboard events only to the active window 
+            if (m_activeWindow) {
+                hwndEventTarget = m_activeWindow->GetHWND();
+            }
             break;
             
-        // Mouse events go to window under cursor
+        // Mouse events go to the window that received the message (Windows already did the bounds testing)
         case WM_LBUTTONDOWN:
         case WM_LBUTTONUP:
         case WM_RBUTTONDOWN:
-        case WM_RBUTTONUP:
+        case WM_RBUTTONUP: {
+            // Log click events with desktop coordinates
+            POINT cursor;
+            GetCursorPos(&cursor);
+            hwndEventTarget = hwndMessageReceiver; // Use the window that received the message
+            DebugLog("CLICK EVENT: %s at desktop coords (%d,%d) -> message receiver %p -> event target %p",
+                     (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP) ? "LEFT" : "RIGHT",
+                     cursor.x, cursor.y, (void*)hwndMessageReceiver, (void*)hwndEventTarget);
+            break;
+        }
         case WM_MOUSEMOVE:
         case WM_MOUSEWHEEL:
-            targetWindow = GetWindowUnderCursor();
+            hwndEventTarget = hwndMessageReceiver; // Use the window that received the message
             break;
             
         default:
-            targetWindow = hwnd; // Default to the window that received the message
+            hwndEventTarget = hwndMessageReceiver; // Default to the window that received the message
             break;
     }
     
     // Queue the event with its target window
-    if (targetWindow) {
-        m_inputEvents.push(InputEvent(targetWindow, msg, wparam, lparam));
-        DebugLog("ProcessInput: Queued %s event for window %p",
-                 (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ? "keyboard" : "mouse",
-                 (void*)targetWindow);
+    if (hwndEventTarget) {
+        m_inputEvents.push(InputEvent(hwndEventTarget, msg, wparam, lparam));
+        // Only log click events to reduce noise
+        if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_RBUTTONDOWN || msg == WM_RBUTTONUP) {
+            DebugLog("CLICK QUEUED: %s event from receiver %p for target %p",
+                     (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ? "keyboard" : "mouse",
+                     (void*)hwndMessageReceiver, (void*)hwndEventTarget);
+        }
     }
 }
 
-void NKWindowManager::ProcessInputEventForWindow(HWND targetWindow, const InputEvent& event) {
-    // Only process the event if it's targeted for the current window
+void NKWindowManager::ProcessInputEventForWindow(HWND hwndNuklearReceiver, const InputEvent& event) {    
     UINT msg = event.msg;
     WPARAM wparam = event.wparam;
     LPARAM lparam = event.lparam;
+
+    // Events are already filtered by ShouldReceiveInput() in UpdateAll() before reaching here
+
     
     switch (msg) {
         case WM_KEYDOWN:
@@ -323,22 +346,38 @@ void NKWindowManager::ProcessInputEventForWindow(HWND targetWindow, const InputE
                 nk_input_unicode(&m_ctx, (nk_rune)wparam);
             }
             break;
-        case WM_LBUTTONDOWN:
-            SetCapture(targetWindow);
-            nk_input_button(&m_ctx, NK_BUTTON_LEFT, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam), 1);
+        case WM_LBUTTONDOWN: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            DebugLog("WINDOW INPUT: LEFT DOWN at window coords (%d,%d) for nuklear receiver %p", x, y, (void*)hwndNuklearReceiver);
+            SetCapture(hwndNuklearReceiver);
+            nk_input_button(&m_ctx, NK_BUTTON_LEFT, x, y, 1);
             break;
-        case WM_LBUTTONUP:
+        }
+        case WM_LBUTTONUP: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            DebugLog("WINDOW INPUT: LEFT UP at window coords (%d,%d) for nuklear receiver %p", x, y, (void*)hwndNuklearReceiver);
             ReleaseCapture();
-            nk_input_button(&m_ctx, NK_BUTTON_LEFT, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam), 0);
+            nk_input_button(&m_ctx, NK_BUTTON_LEFT, x, y, 0);
             break;
-        case WM_RBUTTONDOWN:
-            SetCapture(targetWindow);
-            nk_input_button(&m_ctx, NK_BUTTON_RIGHT, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam), 1);
+        }
+        case WM_RBUTTONDOWN: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            DebugLog("WINDOW INPUT: RIGHT DOWN at window coords (%d,%d) for nuklear receiver %p", x, y, (void*)hwndNuklearReceiver);
+            SetCapture(hwndNuklearReceiver);
+            nk_input_button(&m_ctx, NK_BUTTON_RIGHT, x, y, 1);
             break;
-        case WM_RBUTTONUP:
+        }
+        case WM_RBUTTONUP: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            DebugLog("WINDOW INPUT: RIGHT UP at window coords (%d,%d) for nuklear receiver %p", x, y, (void*)hwndNuklearReceiver);
             ReleaseCapture();
-            nk_input_button(&m_ctx, NK_BUTTON_RIGHT, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam), 0);
+            nk_input_button(&m_ctx, NK_BUTTON_RIGHT, x, y, 0);
             break;
+        }
         case WM_MOUSEMOVE:
             nk_input_motion(&m_ctx, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam));
             break;
@@ -364,80 +403,97 @@ HWND NKWindowManager::GetWindowUnderCursor() {
     return m_focusedWindow;
 }
 
-bool NKWindowManager::ShouldReceiveInput(HWND targetWindow, HWND currentWindow, UINT msg) {
-    // Only the target window should receive the input
-    return (targetWindow == currentWindow);
+bool NKWindowManager::ShouldReceiveInput(HWND hwndEventTarget, HWND hwndBeingProcessed, UINT msg) {
+    // Keyboard events: only active window receives them
+    if (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) {
+        // hwndEventTarget was already set to active window in ProcessInput(), so just check if it matches
+        bool shouldReceive = (hwndEventTarget == hwndBeingProcessed);
+        // DebugLog("ShouldReceiveInput: Keyboard event target=%p being_processed=%p active=%p -> %s",
+        //          (void*)hwndEventTarget, (void*)hwndBeingProcessed,
+        //          m_activeWindow ? (void*)m_activeWindow->GetHWND() : nullptr,
+        //          shouldReceive ? "YES" : "NO");
+        return shouldReceive;
+    }
+    
+    // Mouse events: only the target window receives them (already filtered by bounds)
+    // Only log click event filtering to reduce noise
+    if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_RBUTTONDOWN || msg == WM_RBUTTONUP) {
+        DebugLog("CLICK FILTER: target=%p being_processed=%p -> %s",
+                 (void*)hwndEventTarget, (void*)hwndBeingProcessed,
+                 (hwndEventTarget == hwndBeingProcessed) ? "YES" : "NO");
+    }
+    return (hwndEventTarget == hwndBeingProcessed);
 }
 
 void NKWindowManager::ProcessDrawCommand(std::set<HWND>& windowsNeedingPaint, const struct nk_command* cmd) {
     // This function is now deprecated - we use ProcessDrawCommandForWindow instead
     // Keeping for compatibility but it should not be called in the new architecture
-    DebugLog("ProcessDrawCommand: Deprecated function called - should use ProcessDrawCommandForWindow");
+    DebugLogDraw("ProcessDrawCommand: Deprecated function called - should use ProcessDrawCommandForWindow");
 }
 
-void NKWindowManager::ProcessDrawCommandForWindow(NKGdiBackend* backend, const struct nk_command* cmd) {
-    if (!backend || !backend->memory_dc || !cmd) {
-        DebugLog("ProcessDrawCommandForWindow: Invalid parameters");
+void NKWindowManager::ProcessDrawCommandForWindow(NKGdiBackend* backend, const struct nk_command* drawCommand) {
+    if (!backend || !backend->memory_dc || !drawCommand) {
+        DebugLogDraw("ProcessDrawCommandForWindow: Invalid parameters");
         return;
     }
     
-    HDC memory_dc = backend->memory_dc;
+    HDC memoryDeviceContext = backend->memory_dc;
     
     // Process the draw command for the specific window
-    switch (cmd->type) {
+    switch (drawCommand->type) {
         case NK_COMMAND_NOP:
             break;
         case NK_COMMAND_SCISSOR: {
-            const struct nk_command_scissor* s = (const struct nk_command_scissor*)cmd;
-            HRGN region = CreateRectRgn((int)s->x, (int)s->y, (int)(s->x + s->w), (int)(s->y + s->h));
-            SelectClipRgn(memory_dc, region);
-            DeleteObject(region);
-            DebugLog("ProcessDrawCommandForWindow: Applied scissor region");
+            const struct nk_command_scissor* scissorCmd = (const struct nk_command_scissor*)drawCommand;
+            HRGN clipRegion = CreateRectRgn((int)scissorCmd->x, (int)scissorCmd->y, (int)(scissorCmd->x + scissorCmd->w), (int)(scissorCmd->y + scissorCmd->h));
+            SelectClipRgn(memoryDeviceContext, clipRegion);
+            DeleteObject(clipRegion);
+            DebugLogDraw("ProcessDrawCommandForWindow: Applied scissor region");
         } break;
         case NK_COMMAND_RECT_FILLED: {
-            const struct nk_command_rect_filled* r = (const struct nk_command_rect_filled*)cmd;
-            RECT rect = {(int)r->x, (int)r->y, (int)(r->x + r->w), (int)(r->y + r->h)};
-            HBRUSH brush = CreateSolidBrush(RGB(r->color.r, r->color.g, r->color.b));
-            FillRect(memory_dc, &rect, brush);
-            DeleteObject(brush);
-            DebugLog("ProcessDrawCommandForWindow: Drew filled rectangle");
+            const struct nk_command_rect_filled* rectCmd = (const struct nk_command_rect_filled*)drawCommand;
+            RECT fillRect = {(int)rectCmd->x, (int)rectCmd->y, (int)(rectCmd->x + rectCmd->w), (int)(rectCmd->y + rectCmd->h)};
+            HBRUSH fillBrush = CreateSolidBrush(RGB(rectCmd->color.r, rectCmd->color.g, rectCmd->color.b));
+            FillRect(memoryDeviceContext, &fillRect, fillBrush);
+            DeleteObject(fillBrush);
+            DebugLogDraw("ProcessDrawCommandForWindow: Drew filled rectangle");
         } break;
         case NK_COMMAND_TEXT: {
-            const struct nk_command_text* t = (const struct nk_command_text*)cmd;
-            SetTextColor(memory_dc, RGB(t->foreground.r, t->foreground.g, t->foreground.b));
-            SetBkMode(memory_dc, TRANSPARENT);
+            const struct nk_command_text* textCmd = (const struct nk_command_text*)drawCommand;
+            SetTextColor(memoryDeviceContext, RGB(textCmd->foreground.r, textCmd->foreground.g, textCmd->foreground.b));
+            SetBkMode(memoryDeviceContext, TRANSPARENT);
             
             // Give text more vertical space to prevent clipping - add 50% extra height
-            int extra_height = (int)(t->h * 0.5f);
-            RECT rect = {(int)t->x, (int)t->y - extra_height/2, (int)(t->x + t->w), (int)(t->y + t->h + extra_height/2)};
+            int extraHeight = (int)(textCmd->h * 0.5f);
+            RECT textRect = {(int)textCmd->x, (int)textCmd->y - extraHeight/2, (int)(textCmd->x + textCmd->w), (int)(textCmd->y + textCmd->h + extraHeight/2)};
             
             // Convert to wide char for DrawText
-            wchar_t* wtext = (wchar_t*)malloc((t->length + 1) * sizeof(wchar_t));
-            if (wtext) {
-                MultiByteToWideChar(CP_UTF8, 0, (const char*)t->string, (int)t->length, wtext, (int)t->length);
-                wtext[t->length] = 0;
+            wchar_t* wideText = (wchar_t*)malloc((textCmd->length + 1) * sizeof(wchar_t));
+            if (wideText) {
+                MultiByteToWideChar(CP_UTF8, 0, (const char*)textCmd->string, (int)textCmd->length, wideText, (int)textCmd->length);
+                wideText[textCmd->length] = 0;
                 
                 // Use DT_VCENTER to properly center text vertically in the expanded rectangle
-                DrawTextW(memory_dc, wtext, -1, &rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                free(wtext);
-                DebugLog("ProcessDrawCommandForWindow: Drew text with expanded bounds");
+                DrawTextW(memoryDeviceContext, wideText, -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                free(wideText);
+                DebugLogDraw("ProcessDrawCommandForWindow: Drew text with expanded bounds");
             }
         } break;
         case NK_COMMAND_RECT: {
-            const struct nk_command_rect* r = (const struct nk_command_rect*)cmd;
-            HPEN pen = CreatePen(PS_SOLID, (int)r->line_thickness, RGB(r->color.r, r->color.g, r->color.b));
-            HPEN old_pen = (HPEN)SelectObject(memory_dc, pen);
-            HBRUSH old_brush = (HBRUSH)SelectObject(memory_dc, GetStockObject(NULL_BRUSH));
+            const struct nk_command_rect* outlineCmd = (const struct nk_command_rect*)drawCommand;
+            HPEN outlinePen = CreatePen(PS_SOLID, (int)outlineCmd->line_thickness, RGB(outlineCmd->color.r, outlineCmd->color.g, outlineCmd->color.b));
+            HPEN previousPen = (HPEN)SelectObject(memoryDeviceContext, outlinePen);
+            HBRUSH previousBrush = (HBRUSH)SelectObject(memoryDeviceContext, GetStockObject(NULL_BRUSH));
             
-            Rectangle(memory_dc, (int)r->x, (int)r->y, (int)(r->x + r->w), (int)(r->y + r->h));
+            Rectangle(memoryDeviceContext, (int)outlineCmd->x, (int)outlineCmd->y, (int)(outlineCmd->x + outlineCmd->w), (int)(outlineCmd->y + outlineCmd->h));
             
-            SelectObject(memory_dc, old_brush);
-            SelectObject(memory_dc, old_pen);
-            DeleteObject(pen);
-            DebugLog("ProcessDrawCommandForWindow: Drew rectangle outline");
+            SelectObject(memoryDeviceContext, previousBrush);
+            SelectObject(memoryDeviceContext, previousPen);
+            DeleteObject(outlinePen);
+            DebugLogDraw("ProcessDrawCommandForWindow: Drew rectangle outline");
         } break;
         default:
-            DebugLog("ProcessDrawCommandForWindow: Unhandled command type %d", cmd->type);
+            DebugLogDraw("ProcessDrawCommandForWindow: Unhandled command type %d", drawCommand->type);
             break;
     }
 }
@@ -524,51 +580,51 @@ void NKGdiBackend::Resize(int w, int h) {
     SelectObject(memory_dc, bitmap);
 }
 
-void NKGdiBackend::Render(struct nk_color bg_color, struct nk_context* ctx) {
-    const struct nk_command* cmd;
+void NKGdiBackend::Render(struct nk_color backgroundColor, struct nk_context* nuklearContext) {
+    const struct nk_command* renderCommand;
     
-    if (!memory_dc || !bits || !ctx) return;
+    if (!memory_dc || !bits || !nuklearContext) return;
     
     // Clear background
-    RECT rect = {0, 0, width, height};
-    HBRUSH bg_brush = CreateSolidBrush(RGB(bg_color.r, bg_color.g, bg_color.b));
-    FillRect(memory_dc, &rect, bg_brush);
-    DeleteObject(bg_brush);
+    RECT backgroundRect = {0, 0, width, height};
+    HBRUSH backgroundBrush = CreateSolidBrush(RGB(backgroundColor.r, backgroundColor.g, backgroundColor.b));
+    FillRect(memory_dc, &backgroundRect, backgroundBrush);
+    DeleteObject(backgroundBrush);
     
     // Render nuklear commands
-    nk_foreach(cmd, ctx) {
-        switch (cmd->type) {
+    nk_foreach(renderCommand, nuklearContext) {
+        switch (renderCommand->type) {
         case NK_COMMAND_NOP: break;
         case NK_COMMAND_SCISSOR: {
-            const struct nk_command_scissor* s = (const struct nk_command_scissor*)cmd;
-            HRGN region = CreateRectRgn((int)s->x, (int)s->y, (int)(s->x + s->w), (int)(s->y + s->h));
-            SelectClipRgn(memory_dc, region);
-            DeleteObject(region);
+            const struct nk_command_scissor* scissorCmd = (const struct nk_command_scissor*)renderCommand;
+            HRGN clipRegion = CreateRectRgn((int)scissorCmd->x, (int)scissorCmd->y, (int)(scissorCmd->x + scissorCmd->w), (int)(scissorCmd->y + scissorCmd->h));
+            SelectClipRgn(memory_dc, clipRegion);
+            DeleteObject(clipRegion);
         } break;
         case NK_COMMAND_RECT_FILLED: {
-            const struct nk_command_rect_filled* r = (const struct nk_command_rect_filled*)cmd;
-            RECT rect = {(int)r->x, (int)r->y, (int)(r->x + r->w), (int)(r->y + r->h)};
-            HBRUSH brush = CreateSolidBrush(RGB(r->color.r, r->color.g, r->color.b));
-            FillRect(memory_dc, &rect, brush);
-            DeleteObject(brush);
+            const struct nk_command_rect_filled* rectCmd = (const struct nk_command_rect_filled*)renderCommand;
+            RECT fillRect = {(int)rectCmd->x, (int)rectCmd->y, (int)(rectCmd->x + rectCmd->w), (int)(rectCmd->y + rectCmd->h)};
+            HBRUSH fillBrush = CreateSolidBrush(RGB(rectCmd->color.r, rectCmd->color.g, rectCmd->color.b));
+            FillRect(memory_dc, &fillRect, fillBrush);
+            DeleteObject(fillBrush);
         } break;
         case NK_COMMAND_TEXT: {
-            const struct nk_command_text* t = (const struct nk_command_text*)cmd;
-            SetTextColor(memory_dc, RGB(t->foreground.r, t->foreground.g, t->foreground.b));
+            const struct nk_command_text* textCmd = (const struct nk_command_text*)renderCommand;
+            SetTextColor(memory_dc, RGB(textCmd->foreground.r, textCmd->foreground.g, textCmd->foreground.b));
             SetBkMode(memory_dc, TRANSPARENT);
             
             // Give text more vertical space to prevent clipping - add 50% extra height
-            int extra_height = (int)(t->h * 0.5f);
-            RECT rect = {(int)t->x, (int)t->y - extra_height/2, (int)(t->x + t->w), (int)(t->y + t->h + extra_height/2)};
+            int extraHeight = (int)(textCmd->h * 0.5f);
+            RECT textRect = {(int)textCmd->x, (int)textCmd->y - extraHeight/2, (int)(textCmd->x + textCmd->w), (int)(textCmd->y + textCmd->h + extraHeight/2)};
             
             // Convert to wide char for DrawText
-            wchar_t* wtext = (wchar_t*)malloc((t->length + 1) * sizeof(wchar_t));
-            MultiByteToWideChar(CP_UTF8, 0, (const char*)t->string, (int)t->length, wtext, (int)t->length);
-            wtext[t->length] = 0;
+            wchar_t* wideText = (wchar_t*)malloc((textCmd->length + 1) * sizeof(wchar_t));
+            MultiByteToWideChar(CP_UTF8, 0, (const char*)textCmd->string, (int)textCmd->length, wideText, (int)textCmd->length);
+            wideText[textCmd->length] = 0;
             
             // Use DT_VCENTER to properly center text vertically in the expanded rectangle
-            DrawTextW(memory_dc, wtext, -1, &rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-            free(wtext);
+            DrawTextW(memory_dc, wideText, -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            free(wideText);
         } break;
         default: break;
         }
@@ -593,7 +649,7 @@ void NKGdiBackend::Cleanup() {
     }
 }
 
-int NKGdiBackend::HandleEvent(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+int NKGdiBackend::HandleEvent(HWND eventSourceWindow, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg) {
         case WM_CLOSE:
             // Don't quit the entire app when a single window closes

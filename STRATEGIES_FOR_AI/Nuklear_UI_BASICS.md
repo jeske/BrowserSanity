@@ -29,7 +29,7 @@ public:
     // Input handling - single cycle for all windows
     void BeginInput();
     void EndInput();
-    void ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+    void ProcessInput(HWND eventSourceWindow, UINT msg, WPARAM wparam, LPARAM lparam);
     
     // Centralized GDI backend management
     NKGdiBackend* GetGdiBackend(HWND hwnd);

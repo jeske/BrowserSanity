@@ -138,14 +138,14 @@ void NKWindow::HandleResize(int width, int height) {
     }
 }
 
-int NKWindow::HandleInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+int NKWindow::HandleInput(HWND hwndEventSource, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (m_isDrawing) {
         // Forward input to window manager for processing
-        m_windowManager.ProcessInput(hwnd, msg, wparam, lparam);
+        m_windowManager.ProcessInput(hwndEventSource, msg, wparam, lparam);
         
-        NKGdiBackend* backend = m_windowManager.GetGdiBackend(hwnd);
+        NKGdiBackend* backend = m_windowManager.GetGdiBackend(hwndEventSource);
         if (backend) {
-            return backend->HandleEvent(hwnd, msg, wparam, lparam);
+            return backend->HandleEvent(hwndEventSource, msg, wparam, lparam);
         }
     }
     return 0;
@@ -218,66 +218,68 @@ NKWindow* GetWindowFromHWND(HWND hwnd) {
 }
 
 // Generic window procedure
-LRESULT CALLBACK NKWindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-    NKWindow* window = GetWindowFromHWND(hwnd);
+LRESULT CALLBACK NKWindowProc(HWND hwndEventSource, UINT msg, WPARAM wparam, LPARAM lparam) {
+    NKWindow* eventSourceWindow = GetWindowFromHWND(hwndEventSource);
     
-    if (window && window->HandleInput(hwnd, msg, wparam, lparam)) {
-        InvalidateRect(hwnd, NULL, FALSE);
+    if (eventSourceWindow && eventSourceWindow->HandleInput(hwndEventSource, msg, wparam, lparam)) {
+        InvalidateRect(hwndEventSource, NULL, FALSE);
         return 0;
     }
     
     switch (msg) {
         case WM_SETFOCUS:
-            if (window) {
+            if (eventSourceWindow) {
                 // Update the window manager's focused window
-                window->m_windowManager.SetFocusedWindow(hwnd);
-                DebugLog("WM_SETFOCUS: Window %p gained focus", hwnd);
+                eventSourceWindow->m_windowManager.SetFocusedWindow(hwndEventSource);
+                // Also set this window as the active window for keyboard input
+                eventSourceWindow->m_windowManager.SetActiveWindow(eventSourceWindow);
+                DebugLog("WM_SETFOCUS: Window %p gained focus and became active", hwndEventSource);
             }
             return 0;
         case WM_KILLFOCUS:
-            if (window) {
+            if (eventSourceWindow) {
                 // Clear focus if this window is losing it
-                if (window->m_windowManager.GetFocusedWindow() == hwnd) {
-                    window->m_windowManager.SetFocusedWindow(nullptr);
-                    DebugLog("WM_KILLFOCUS: Window %p lost focus", hwnd);
+                if (eventSourceWindow->m_windowManager.GetFocusedWindow() == hwndEventSource) {
+                    eventSourceWindow->m_windowManager.SetFocusedWindow(nullptr);
+                    DebugLog("WM_KILLFOCUS: Window %p lost focus", hwndEventSource);
                 }
             }
             return 0;
         case WM_SIZE:
-            if (window) {
-                window->HandleResize(LOWORD(lparam), HIWORD(lparam));
-                InvalidateRect(hwnd, NULL, FALSE);
+            if (eventSourceWindow) {
+                eventSourceWindow->HandleResize(LOWORD(lparam), HIWORD(lparam));
+                InvalidateRect(hwndEventSource, NULL, FALSE);
             }
             return 0;
         case WM_PAINT: {
-            DebugLog("WM_PAINT: Starting paint for HWND %p", hwnd);
+            DebugLogDraw("WM_PAINT: Starting paint for HWND %p", hwndEventSource);
             PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            if (window) {
+            HDC windowDeviceContext = BeginPaint(hwndEventSource, &ps);
+            if (eventSourceWindow) {
                 // Get GDI backend from window manager and copy from memory DC to window DC
-                NKGdiBackend* backend = window->m_windowManager.GetGdiBackend(hwnd);
+                NKGdiBackend* backend = eventSourceWindow->m_windowManager.GetGdiBackend(hwndEventSource);
                 if (backend && backend->memory_dc) {
-                    DebugLog("WM_PAINT: BitBlt from memory DC to window DC for HWND %p", hwnd);
-                    BitBlt(hdc, 0, 0, window->GetWidth(), window->GetHeight(),
+                    DebugLogDraw("WM_PAINT: BitBlt from memory DC to window DC for HWND %p", hwndEventSource);
+                    BitBlt(windowDeviceContext, 0, 0, eventSourceWindow->GetWidth(), eventSourceWindow->GetHeight(),
                            backend->memory_dc, 0, 0, SRCCOPY);
                 } else {
-                    DebugLog("WM_PAINT: No backend or memory_dc for HWND %p", hwnd);
+                    DebugLogDraw("WM_PAINT: No backend or memory_dc for HWND %p", hwndEventSource);
                 }
             } else {
-                DebugLog("WM_PAINT: Window not active for HWND %p", hwnd);
+                DebugLogDraw("WM_PAINT: Window not active for HWND %p", hwndEventSource);
             }
-            EndPaint(hwnd, &ps);
-            DebugLog("WM_PAINT: Paint complete for HWND %p", hwnd);
+            EndPaint(hwndEventSource, &ps);
+            DebugLogDraw("WM_PAINT: Paint complete for HWND %p", hwndEventSource);
             return 0;
         }
         case WM_CLOSE:
-            if (window) {
-                window->HideWindow();
+            if (eventSourceWindow) {
+                eventSourceWindow->HideWindow();
             }
             return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
     }
-    return DefWindowProc(hwnd, msg, wparam, lparam);
+    return DefWindowProc(hwndEventSource, msg, wparam, lparam);
 }

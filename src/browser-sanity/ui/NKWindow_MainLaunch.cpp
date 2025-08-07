@@ -63,7 +63,7 @@ public:
     char m_redirectUrl[URL_SIZE] = "https://www.google.com";
     
     virtual void Render() override {
-        DebugLog("MainLaunch: Starting render for HWND %p", (void*)GetHWND());
+        DebugLogDraw("MainLaunch: Starting render for HWND %p", (void*)GetHWND());
         struct nk_context* ctx = GetContext();
         
         // Create unique window name using HWND to avoid conflicts
@@ -72,7 +72,7 @@ public:
         
         if (nk_begin(ctx, windowName, nk_rect(10.0f, 10.0f, (float)(GetWidth() - 20), (float)(GetHeight() - 20)),
                      NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_TITLE)) {
-            DebugLog("MainLaunch: nk_begin successful, building UI");
+            DebugLogDraw("MainLaunch: nk_begin successful, building UI");
             
             // Header with spacing
             nk_layout_row_dynamic(ctx, 35, 1);
@@ -194,7 +194,7 @@ public:
             }
         }
         nk_end(ctx);
-        DebugLog("MainLaunch: Render complete for HWND %p", (void*)GetHWND());
+        DebugLogDraw("MainLaunch: Render complete for HWND %p", (void*)GetHWND());
     }
     
     virtual void OnCreate() override {

@@ -16,7 +16,8 @@ extern "C" {
 typedef enum {
     DEBUG_LEVEL_OFF = 0,   // No logging
     DEBUG_LEVEL_ERROR = 1, // Only errors
-    DEBUG_LEVEL_INFO = 2   // Info and errors (default)
+    DEBUG_LEVEL_INFO = 2,  // Info and errors (default)
+    DEBUG_LEVEL_DRAW = 3   // Drawing/rendering operations (very verbose)
 } DebugLevel;
 
 // Global debug level - can be changed at runtime
@@ -25,7 +26,7 @@ extern DebugLevel g_debugLevel;
 
 // Debug level names for logging
 static const char* DEBUG_LEVEL_NAMES[] = {
-    "OFF", "ERROR", "INFO"
+    "OFF", "ERROR", "INFO", "DRAW"
 };
 
 // Internal logging function with level check
@@ -60,6 +61,7 @@ inline void DebugLogWithLevel(DebugLevel level, const char* levelName, const cha
 // Convenience macros for different log levels
 #define DebugLogError(format, ...)   DebugLogWithLevel(DEBUG_LEVEL_ERROR, "ERROR", format, ##__VA_ARGS__)
 #define DebugLogInfo(format, ...)    DebugLogWithLevel(DEBUG_LEVEL_INFO, "INFO", format, ##__VA_ARGS__)
+#define DebugLogDraw(format, ...)    DebugLogWithLevel(DEBUG_LEVEL_DRAW, "DRAW", format, ##__VA_ARGS__)
 
 // Backward compatibility - maps to INFO level
 #define DebugLog(format, ...)        DebugLogInfo(format, ##__VA_ARGS__)
@@ -68,8 +70,8 @@ inline void DebugLogWithLevel(DebugLevel level, const char* levelName, const cha
 inline void SetDebugLevel(DebugLevel level) {
     g_debugLevel = level;
     if (level > DEBUG_LEVEL_OFF) {
-        DebugLogInfo("Debug level set to %s (%d)", 
-                     (level < 3) ? DEBUG_LEVEL_NAMES[level] : "UNKNOWN", level);
+        DebugLogInfo("Debug level set to %s (%d)",
+                     (level < 4) ? DEBUG_LEVEL_NAMES[level] : "UNKNOWN", level);
     }
 }
 

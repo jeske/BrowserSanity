@@ -34,7 +34,7 @@ struct NKGdiBackend;  // Forward declaration
  * Provides common window management, Nuklear context, and virtual interface
  */
 class NKWindow {
-    friend LRESULT CALLBACK NKWindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+    friend LRESULT CALLBACK NKWindowProc(HWND hwndEventSource, UINT msg, WPARAM wparam, LPARAM lparam);
     
 public:
     NKWindow(NKWindowManager& windowManager, const std::string& title, int width, int height);
@@ -50,7 +50,7 @@ public:
     void BeginFrame();
     void EndFrame();
     void HandleResize(int width, int height);
-    int HandleInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+    int HandleInput(HWND hwndEventSource, UINT msg, WPARAM wparam, LPARAM lparam);
     
     // Virtual interface for derived classes
     virtual void Render() = 0;  // Pure virtual - each dialog implements its own UI
@@ -94,7 +94,7 @@ protected:
 
 
 // C-style window procedure that delegates to C++ class
-LRESULT CALLBACK NKWindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+LRESULT CALLBACK NKWindowProc(HWND hwndEventSource, UINT msg, WPARAM wparam, LPARAM lparam);
 
 // Window procedure lookup - maps HWND to NKWindow instance
 void RegisterWindowMapping(HWND hwnd, NKWindow* window);

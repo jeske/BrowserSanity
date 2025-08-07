@@ -143,9 +143,12 @@ bool InitializeWindows(NKWindowManager& windowManager) {
 }
 
 // Show initial windows
-void ShowInitialWindows(int nCmdShow) {
+void ShowInitialWindows(NKWindowManager& windowManager, int nCmdShow) {
     // Show only the main install/uninstall dialog at startup
     g_app.mainWindow->ShowWindow(nCmdShow);
+    
+    // Set the main window as the active window for keyboard input
+    windowManager.SetActiveWindow(g_app.mainWindow.get());
     
     // Keep settings and toast windows hidden initially
     // They will be shown when requested by user actions
@@ -239,7 +242,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     
     // Show initial windows
     DebugLog("Showing initial windows");
-    ShowInitialWindows(nCmdShow);
+    ShowInitialWindows(windowManager, nCmdShow);
     
     // Run main message loop
     DebugLog("Starting message loop");

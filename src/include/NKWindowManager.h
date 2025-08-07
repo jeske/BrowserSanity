@@ -82,9 +82,9 @@ struct NKGdiBackend {
     
     void Initialize(HWND hwnd, int w, int h);
     void Resize(int w, int h);
-    void Render(struct nk_color bg_color, struct nk_context* ctx);
+    void Render(struct nk_color backgroundColor, struct nk_context* nuklearContext);
     void Cleanup();
-    int HandleEvent(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+    int HandleEvent(HWND eventSourceWindow, UINT msg, WPARAM wparam, LPARAM lparam);
 };
 
 /**
@@ -122,7 +122,7 @@ public:
     
     // Draw command processing
     void ProcessDrawCommand(std::set<HWND>& windowsNeedingPaint, const struct nk_command* cmd);
-    void ProcessDrawCommandForWindow(NKGdiBackend* backend, const struct nk_command* cmd);
+    void ProcessDrawCommandForWindow(NKGdiBackend* backend, const struct nk_command* drawCommand);
     
     // GDI backend management
     NKGdiBackend* GetGdiBackend(HWND hwnd);
