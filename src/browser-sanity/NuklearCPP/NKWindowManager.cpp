@@ -324,7 +324,9 @@ void NKWindowManager::ProcessDrawCommandForWindow(NKGdiBackend* backend, const s
             SetTextColor(memory_dc, RGB(t->foreground.r, t->foreground.g, t->foreground.b));
             SetBkMode(memory_dc, TRANSPARENT);
             
-            RECT rect = {(int)t->x, (int)t->y, (int)(t->x + t->w), (int)(t->y + t->h)};
+            // Give text more vertical space to prevent clipping - add 50% extra height
+            int extra_height = (int)(t->h * 0.5f);
+            RECT rect = {(int)t->x, (int)t->y - extra_height/2, (int)(t->x + t->w), (int)(t->y + t->h + extra_height/2)};
             
             // Convert to wide char for DrawText
             wchar_t* wtext = (wchar_t*)malloc((t->length + 1) * sizeof(wchar_t));
@@ -332,9 +334,10 @@ void NKWindowManager::ProcessDrawCommandForWindow(NKGdiBackend* backend, const s
                 MultiByteToWideChar(CP_UTF8, 0, (const char*)t->string, (int)t->length, wtext, (int)t->length);
                 wtext[t->length] = 0;
                 
-                DrawTextW(memory_dc, wtext, -1, &rect, DT_LEFT | DT_TOP | DT_SINGLELINE);
+                // Use DT_VCENTER to properly center text vertically in the expanded rectangle
+                DrawTextW(memory_dc, wtext, -1, &rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
                 free(wtext);
-                DebugLog("ProcessDrawCommandForWindow: Drew text");
+                DebugLog("ProcessDrawCommandForWindow: Drew text with expanded bounds");
             }
         } break;
         case NK_COMMAND_RECT: {
@@ -471,14 +474,17 @@ void NKGdiBackend::Render(struct nk_color bg_color, struct nk_context* ctx) {
             SetTextColor(memory_dc, RGB(t->foreground.r, t->foreground.g, t->foreground.b));
             SetBkMode(memory_dc, TRANSPARENT);
             
-            RECT rect = {(int)t->x, (int)t->y, (int)(t->x + t->w), (int)(t->y + t->h)};
+            // Give text more vertical space to prevent clipping - add 50% extra height
+            int extra_height = (int)(t->h * 0.5f);
+            RECT rect = {(int)t->x, (int)t->y - extra_height/2, (int)(t->x + t->w), (int)(t->y + t->h + extra_height/2)};
             
             // Convert to wide char for DrawText
             wchar_t* wtext = (wchar_t*)malloc((t->length + 1) * sizeof(wchar_t));
             MultiByteToWideChar(CP_UTF8, 0, (const char*)t->string, (int)t->length, wtext, (int)t->length);
             wtext[t->length] = 0;
             
-            DrawTextW(memory_dc, wtext, -1, &rect, DT_LEFT | DT_TOP | DT_SINGLELINE);
+            // Use DT_VCENTER to properly center text vertically in the expanded rectangle
+            DrawTextW(memory_dc, wtext, -1, &rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             free(wtext);
         } break;
         default: break;

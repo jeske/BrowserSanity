@@ -43,8 +43,8 @@ NKWindow::~NKWindow() {
 }
 
 bool NKWindow::CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const char* className, int x, int y) {
-    // Use ANSI string for title to match project's MultiByte character set
-    const char* ansiTitle = "Browser Sanity - Test Window Title";
+    // Use the window's actual title (ANSI string to match project's MultiByte character set)
+    const char* ansiTitle = m_title.c_str();
     
     DebugLog("CreateOSWindow: Creating window with title: %s", ansiTitle);
     
