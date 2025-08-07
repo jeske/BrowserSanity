@@ -20,18 +20,24 @@ Browser Sanity is a Windows application that ensures browser choice preferences 
 │   └── browser-sanity/         # BrowserSanity.exe application code
 │       ├── actions/            # Action implementations (install, uninstall, resources, watchdog)
 │       ├── ui/                 # NEW: Nana UI window implementations
-│       │   ├── nana_installer.cpp  # Installer window (info, GitHub, install)
+│       │   ├── nana_initialLaunchInstall.cpp  # Installer window (info, GitHub, install)
 │       │   ├── nana_settings.cpp   # Settings window (redirect status, uninstall)
-│       │   ├── nana_progress.cpp   # Install/uninstall progress window
-│       │   └── nana_toast.cpp      # Toast notification window
+│       │   ├── nana_installUninstallProgress.cpp   # Install/uninstall progress window
+│       │   ├── nana_toast.cpp      # Toast notification window
+│       │   └── nana_common_style.hpp  # Common styling for all UI components
 │       ├── watchdog/           # Background monitoring functionality
 │       ├── main_nana.cpp       # NEW: Nana-based main entry point
 │       └── main.cpp            # Original main entry point
 ├── deps/                       # Dependencies
-│   └── nana/                   # Nana GUI library source code (complete integration)
+│   └── nana/                   # Nana GUI library (git submodule)
 ├── include/                    # Header files
 ├── res/                        # Resource files (icons, embedded binaries)
 ├── docs/                       # Documentation
+│   ├── DEVELOPMENT.md          # Development guidelines
+│   ├── USER_GUIDE.md           # User documentation
+│   ├── SafeStringHandling_Implementation.md # Safe string handling details
+│   └── history/                # Historical project documents
+│       └── Initial-Project-Spec.md # Original project specification
 ├── STRATEGIES_FOR_AI/          # AI development guidance documents
 ├── BrowserSanity_Nana.vcxproj  # NEW: Nana-based Visual Studio project
 ├── BrowserSanity.vcxproj       # Original Nuklear-based project
@@ -60,7 +66,7 @@ Browser Sanity is a Windows application that ensures browser choice preferences 
 
 Based on original project specification, the application provides these windows:
 
-1. **nana_installer.cpp** - `NanaInstallerWindow`
+1. **nana_initialLaunchInstall.cpp** - `NanaInitialLaunchInstallWindow`
    - Shows when run from outside Program Files
    - Application information and purpose description
    - Clickable GitHub link (https://github.com/jeske/BrowserSanity)
@@ -74,7 +80,7 @@ Based on original project specification, the application provides these windows:
    - Startup options control ("Start with Windows")
    - Uninstall functionality with confirmation
 
-3. **nana_progress.cpp** - `NanaInstallProgressWindow`
+3. **nana_installUninstallProgress.cpp** - `NanaInstallUninstallProgressWindow`
    - Shows during install/uninstall operations
    - Progress bar with percentage completion
    - Dynamic status messages for each step
@@ -102,7 +108,8 @@ Modular action implementations following the pattern `action_{name}.c`:
 - **RAII Resource Management**: Modern C++ patterns with automatic cleanup
 
 ### Nana Integration Details
-- **Library Location**: Complete Nana source integrated in `deps/nana/`
+- **Library Location**: Nana source integrated as git submodule in `deps/nana/`
+- **Submodule Setup**: Configured in `.gitmodules` file for proper version control
 - **Build Integration**: All Nana source files included in `BrowserSanity_Nana.vcxproj`
 - **Layout System**: Uses Nana's place layout manager for automatic UI arrangement
 - **Event Handling**: Lambda-based event handlers with proper resource management
@@ -123,6 +130,18 @@ The project uses Visual Studio project files (`.vcxproj`/`.sln`) with MSVC compi
 2. Run `build_nana.bat` to compile the Nana-based project
 3. Test window functionality and action implementations
 4. Archive old code in `Archive/` directory rather than deletion for reference
+
+## Project History
+The original project specification can be found in `docs/history/Initial-Project-Spec.md`. This document outlines the initial goals of the project:
+
+1. Create a lightweight program that replaces msedge.exe to redirect to the user's preferred browser
+2. Develop a main application (BrowserSanity.exe) that serves as:
+   - An installer
+   - A settings UI
+   - An uninstaller
+   - A background watchdog
+
+The project initially used Nuklear for the UI, but due to issues with Nuklear's multi-window management (which took 14+ hours of troubleshooting), the decision was made to migrate to Nana for a cleaner, more maintainable codebase.
 
 ## Migration Status: COMPLETE ✅
 - ✅ Nuklear → Nana migration completed

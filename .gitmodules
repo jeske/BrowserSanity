@@ -1,0 +1,4 @@
+[submodule "deps/nana"]
+	path = deps/nana
+	url = https://github.com/cnjinhao/nana.git
+	branch = master

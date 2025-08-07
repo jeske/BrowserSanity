@@ -12,10 +12,13 @@
 #include <nana/gui/widgets/form.hpp>
 #include <nana/gui/widgets/button.hpp>
 #include <nana/gui/widgets/label.hpp>
+#include <nana/gui/widgets/picture.hpp>
 #include <nana/gui/place.hpp>
 #include <nana/gui/msgbox.hpp>
+#include <nana/paint/image.hpp>
 #include <memory>
 #include <string>
+#include <windows.h>
 
 // Include C functionality
 extern "C" {
@@ -35,12 +38,14 @@ private:
     nana::place layout;
     
     // UI Controls
+    nana::picture appIconPicture;
     nana::label titleLabel;
     nana::label descriptionLabel;
     nana::label purposeLabel;
     nana::button githubLinkButton;
     nana::label versionLabel;
     nana::button updateButton;
+    nana::label creditsLabel;
     nana::button installButton;
     nana::button exitButton;
     
@@ -50,15 +55,17 @@ private:
     std::string latestVersion;
     
 public:
-    NanaInstallerWindow() 
-        : installerForm(nana::API::make_center(500, 400))
+    NanaInstallerWindow()
+        : installerForm(nana::API::make_center(500, 500))
         , layout(installerForm)
+        , appIconPicture(installerForm)
         , titleLabel(installerForm)
         , descriptionLabel(installerForm)
         , purposeLabel(installerForm)
         , githubLinkButton(installerForm)
         , versionLabel(installerForm)
         , updateButton(installerForm)
+        , creditsLabel(installerForm)
         , installButton(installerForm)
         , exitButton(installerForm)
         , updateAvailable(false)
@@ -71,18 +78,36 @@ public:
         CheckForUpdates();
     }
     
-    void Show() { installerForm.show(); }
+    void Show() {
+        installerForm.modality(); // Make dialog modal
+        installerForm.show();
+    }
     void Hide() { installerForm.hide(); }
 
 private:
     void InitializeWindow() {
         installerForm.caption("Browser Sanity - Installer");
+        installerForm.bgcolor(nana::colors::white);
+        
+        // Load application icon
+        try {
+            // Try to load icon from resources
+            // In a real implementation, you would load from resources
+            // For now, we'll use a placeholder approach
+            nana::paint::image img;
+            // img.open("path/to/icon.png");
+            // appIconPicture.load(img);
+        } catch (const std::exception& e) {
+            DebugLogError("Failed to load app icon: %s", e.what());
+        }
         
         titleLabel.caption("Browser Sanity");
         titleLabel.text_align(nana::align::center);
+        titleLabel.typeface(nana::paint::font("", 16, true)); // Bold, larger font
         
         descriptionLabel.caption("End the tyranny of applications that ignore your default browser settings!");
         descriptionLabel.text_align(nana::align::center);
+        descriptionLabel.typeface(nana::paint::font("", 11, true)); // Bold
         
         purposeLabel.caption(
             "Browser Sanity replaces msedge.exe to redirect Edge launches to your preferred browser.\n\n"
@@ -96,29 +121,38 @@ private:
         githubLinkButton.caption("View on GitHub");
         versionLabel.caption("Version: " + currentVersion);
         updateButton.caption("Update Available");
+        
+        creditsLabel.caption("Created by David Jeske\nPowered by Nana C++ GUI Library");
+        creditsLabel.text_align(nana::align::center);
+        
         installButton.caption("Install Browser Sanity");
         exitButton.caption("Exit");
         
         // Initially hide update button
         updateButton.enabled(false);
+        
+        // Set focus to install button
+        installButton.focus();
     }
     
     void SetupLayout() {
         layout.div(
             "vert margin=20 gap=15"
-            "<title weight=40>"
-            "<description weight=60>"
+            "<header weight=60 arrange=[20%,80%]>"
+            "<description weight=40>"
             "<purpose weight=120>"
             "<github weight=35>"
             "<version_info weight=35>"
+            "<credits weight=50>"
             "<buttons weight=40>"
         );
         
-        layout.field("title") << titleLabel;
+        layout.field("header") << appIconPicture << titleLabel;
         layout.field("description") << descriptionLabel;
         layout.field("purpose") << purposeLabel;
         layout.field("github") << githubLinkButton;
         layout.field("version_info") << versionLabel << updateButton;
+        layout.field("credits") << creditsLabel;
         layout.field("buttons") << installButton << exitButton;
         
         layout.collocate();
@@ -161,61 +195,53 @@ private:
     }
     
     void PerformInstallationWithProgress() {
-        // Start installation process with progress updates
-        std::thread([this]() {
-            try {
-                UpdateProgressWindow(10, "Preparing installation...");
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // Perform installation process with progress updates (single-threaded)
+        try {
+            UpdateProgressWindow(10, "Preparing installation...");
+            Sleep(500); // Use Windows Sleep instead of std::this_thread
+            
+            UpdateProgressWindow(25, "Checking system requirements...");
+            Sleep(500);
+            
+            UpdateProgressWindow(40, "Creating program directories...");
+            Sleep(500);
+            
+            UpdateProgressWindow(60, "Installing application files...");
+            bool installResult = InstallApplication();
+            
+            if (installResult) {
+                UpdateProgressWindow(80, "Configuring startup settings...");
+                Sleep(500);
                 
-                UpdateProgressWindow(25, "Checking system requirements...");
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                UpdateProgressWindow(95, "Finalizing installation...");
+                Sleep(500);
                 
-                UpdateProgressWindow(40, "Creating program directories...");
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                CompleteProgressWindow(true);
                 
-                UpdateProgressWindow(60, "Installing application files...");
-                bool installResult = InstallApplication();
+                // Show completion message and exit
+                nana::msgbox msg(installerForm, "Installation Complete");
+                msg.icon(nana::msgbox::icon_information);
+                msg << "Browser Sanity has been successfully installed!\n\nThe application will now launch from Program Files.";
+                msg.show();
                 
-                if (installResult) {
-                    UpdateProgressWindow(80, "Configuring startup settings...");
-                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                    
-                    UpdateProgressWindow(95, "Finalizing installation...");
-                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                    
-                    CompleteProgressWindow(true);
-                    
-                    // Show completion message and exit
-                    nana::API::post_quit_guard([this]() {
-                        nana::msgbox msg(installerForm, "Installation Complete");
-                        msg.icon(nana::msgbox::icon_information);
-                        msg << "Browser Sanity has been successfully installed!\n\nThe application will now launch from Program Files.";
-                        msg.show();
-                        
-                        LaunchInstalledVersion();
-                        nana::API::exit_all();
-                    });
-                } else {
-                    CompleteProgressWindow(false);
-                    
-                    nana::API::post_quit_guard([this]() {
-                        nana::msgbox msg(installerForm, "Installation Failed");
-                        msg.icon(nana::msgbox::icon_error);
-                        msg << "Failed to install Browser Sanity. Please check the logs for details.";
-                        msg.show();
-                    });
-                }
-            } catch (const std::exception& e) {
+                LaunchInstalledVersion();
+                nana::API::exit_all();
+            } else {
                 CompleteProgressWindow(false);
                 
-                nana::API::post_quit_guard([this, e]() {
-                    nana::msgbox msg(installerForm, "Installation Error");
-                    msg.icon(nana::msgbox::icon_error);
-                    msg << "Installation failed with error: " << e.what();
-                    msg.show();
-                });
+                nana::msgbox msg(installerForm, "Installation Failed");
+                msg.icon(nana::msgbox::icon_error);
+                msg << "Failed to install Browser Sanity. Please check the logs for details.";
+                msg.show();
             }
-        }).detach();
+        } catch (const std::exception& e) {
+            CompleteProgressWindow(false);
+            
+            nana::msgbox msg(installerForm, "Installation Error");
+            msg.icon(nana::msgbox::icon_error);
+            msg << "Installation failed with error: " << e.what();
+            msg.show();
+        }
     }
     
     void LaunchInstalledVersion() {

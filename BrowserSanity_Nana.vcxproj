@@ -53,6 +53,10 @@
   <ItemGroup>
     <!-- New Nana-based C++ application files -->
     <ClCompile Include="src\browser-sanity\main_nana.cpp" />
+    <ClCompile Include="src\browser-sanity\ui\nana_toast.cpp" />
+    <ClCompile Include="src\browser-sanity\ui\nana_initialLaunchInstall.cpp" />
+    <ClCompile Include="src\browser-sanity\ui\nana_installUninstallProgress.cpp" />
+    <ClCompile Include="src\browser-sanity\ui\nana_settings.cpp" />
     
     <!-- C core functionality (unchanged) -->
     <ClCompile Include="src\browser-sanity\browser_sanity.c" />
