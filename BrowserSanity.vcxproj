@@ -48,18 +48,22 @@
   
   <!-- BrowserSanity.exe source files -->
   <ItemGroup>
-    <ClCompile Include="src\browser-sanity\main.c" />
+    <!-- C++ main application and window management -->
+    <ClCompile Include="src\browser-sanity\main.cpp" />
+    <ClCompile Include="src\browser-sanity\nuklear_impl.cpp" />
+    <ClCompile Include="src\browser-sanity\NKWindow.cpp" />
+    <ClCompile Include="src\browser-sanity\NKWindowManager.cpp" />
+    <ClCompile Include="src\browser-sanity\ui\NKWindow_MainLaunch.cpp" />
+    <ClCompile Include="src\browser-sanity\ui\NKWindow_Settings.cpp" />
+    <ClCompile Include="src\browser-sanity\ui\NKWindow_Toast.cpp" />
+    
+    <!-- C core functionality -->
     <ClCompile Include="src\browser-sanity\browser_sanity.c" />
     <ClCompile Include="src\browser-sanity\actions\action_resources.c" />
-    <ClCompile Include="src\browser-sanity\ui\ui.c" />
-    <ClCompile Include="src\browser-sanity\ui\dialog_manualLaunch.c" />
-    <ClCompile Include="src\browser-sanity\ui\dialog_manualLaunchInstall.c" />
-    <ClCompile Include="src\browser-sanity\ui\dialog_mainSettings.c" />
-    <ClCompile Include="src\browser-sanity\ui\dialog_installanduninstallprogress.c" />
-    <ClCompile Include="src\browser-sanity\watchdog\watchdog.c" />
     <ClCompile Include="src\browser-sanity\actions\action_install.c" />
     <ClCompile Include="src\browser-sanity\actions\action_uninstall.c" />
     <ClCompile Include="src\browser-sanity\actions\action_watchdog.c" />
+    <ClCompile Include="src\browser-sanity\watchdog\watchdog.c" />
     <ClCompile Include="src\browser-sanity\msedge_redirect_lib.c" />
   </ItemGroup>
   

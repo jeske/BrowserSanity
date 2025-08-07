@@ -6,8 +6,14 @@ both for posterity, and for the purpose of helping others understand a bit how I
 prompts for the AI. There was lots more than this that went into getting the app done
 but the first release did only take a single day with the help of the AI. Which is pretty
 astounding, especially considering it IS the installer/uninstaller/daemon/UI/and tool.
-It would have taken less time if I spent a little more time in the design phase, or if
-this was not my first native windows AI pair-coding attempt. 
+
+It would have taken less time if I spent a little more time in the design phase, or if this was not my first native windows AI pair-coding attempt. I wanted an ultra-simple
+tiny build with no dependencies, so I started with raw win32
+UI, and it did a semi-decent job, but it was getting confused with the different message pumps for the different windows. So I went looking for a lightweight UI kit that
+might fix this. I liked the idea of the "single header include" nuklear, so I used it.. not realizing it doesn't
+actually handle the message pump. I'm pretty sure the AI
+would have done better with FLTK, but I didn't want a compile
+dependency. 
 
 Special thanks to "The Intern" (Claude Sonnet 4) - David Jeske
 

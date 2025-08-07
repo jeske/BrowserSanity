@@ -24,6 +24,8 @@
 
 # Personal Archive (untracked)
 Archive/
+ARCHIVE/
+SCRATCH/
 
 # Visual Studio intermediate files
 Release/

@@ -33,7 +33,16 @@ Modular action implementations following the pattern `action_{name}.c`:
 - `action_watchdog.c` - Background monitoring service
 
 ### UI Directory (`src/browser-sanity/ui/`)
-Individual dialog components following the pattern `dialog_{purpose}.c`:
+**UI Framework Migration**: The project has migrated from manual Windows API dialogs to **Nuklear** immediate mode GUI framework for automatic DPI scaling and simplified UI code.
+
+**Nuklear Integration**:
+- **Header Location**: [`include/nuklear.h`](include/nuklear.h) (single-header library)
+- **File Size**: ~640K lines (too large to read directly, use external documentation)
+- **GitHub Source**: https://github.com/Immediate-Mode-UI/Nuklear
+- **Documentation**: https://immediate-mode-ui.github.io/Nuklear/
+- **Benefits**: Automatic DPI scaling, immediate mode rendering, much simpler code vs manual Windows API
+
+**Legacy Dialog Files** (archived in `Archive/old_ui_system/`):
 - `dialog_manualLaunch.c` - Main status dialog when app run directly
 - `dialog_manualLaunchInstall.c` - Installation prompt dialog (when app not found)
 - `dialog_mainSettings.c` - Configuration settings dialog
@@ -44,6 +53,7 @@ Individual dialog components following the pattern `dialog_{purpose}.c`:
 - **Consistent Naming**: Files named by their primary function using descriptive terms
 - **Modular Design**: Actions can be called independently, dialogs are self-contained
 - **Unified Progress**: Install/uninstall operations share common progress tracking to avoid duplication
+- **Immediate Mode UI**: Nuklear provides automatic DPI scaling and eliminates complex Windows API dialog management
 
 ## Build System
 The project uses Visual Studio project files (`.vcxproj`/`.sln`) with MSVC compiler. Build targets:

@@ -230,8 +230,8 @@ int ShowInstallUninstallProgressDialog(HWND hwndParent, BOOL isInstall) {
         UpdateProgressStep(pData, i);
     }
     
-    // Set fonts
-    HFONT hFont = CreateFont(14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+    // Set fonts using constants
+    HFONT hFont = CreateFont(FONT_SIZE_SMALL, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
         DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
         

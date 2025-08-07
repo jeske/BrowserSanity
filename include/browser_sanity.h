@@ -184,11 +184,71 @@ BOOL IsProcessRunningWithPID(DWORD* outPID);
  */
 BOOL IsComprehensivelyInstalled();
 
-// UI Dialog Functions
+// UI State structure
+typedef struct {
+    BOOL show_installation_dialog;
+    BOOL show_main_dialog;
+    BOOL show_settings_dialog;
+    BOOL show_test_dialog;  // For testing Nuklear
+    int dialog_result;
+    BOOL isRunning;
+    BOOL isInstalled;
+    DWORD runningPID;
+} UIState;
+
+// Nuklear UI Functions
+
+/**
+ * @brief Initialize Nuklear GUI system
+ * @param hwnd Window handle for GDI context
+ * @return TRUE if successful, FALSE otherwise
+ */
+BOOL InitializeNuklearUI(HWND hwnd);
+
+/**
+ * @brief Set initial UI state based on application context
+ * @param isRunning TRUE if application is currently running
+ * @param isInstalled TRUE if application is installed
+ */
+void SetInitialUIState(BOOL isRunning, BOOL isInstalled);
+
+/**
+ * @brief Cleanup Nuklear resources
+ */
+void CleanupNuklearUI();
+
+/**
+ * @brief Main UI render function - called from message loop
+ * @param hwnd Window handle
+ */
+void RenderNuklearUI(HWND hwnd);
+
+/**
+ * @brief Handle Windows messages for Nuklear input
+ * @param hwnd Window handle
+ * @param msg Message type
+ * @param wparam Message parameter
+ * @param lparam Message parameter
+ * @return TRUE if message was handled, FALSE otherwise
+ */
+BOOL HandleNuklearInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
+/**
+ * @brief Render the installation dialog
+ * @param ctx Nuklear context
+ * @param ui_state UI state structure
+ */
+void RenderInstallationDialog(struct nk_context *ctx, UIState *ui_state);
+
+/**
+ * @brief Shows the installation information dialog when Browser Sanity is not found
+ * @param hwndParent Parent window handle
+ * @return Dialog result (IDYES = Install, IDNO = Cancel)
+ */
+int ShowInstallationInfoDialog(HWND hwndParent);
 
 /**
  * @brief Shows the manual launch dialog when BrowserSanity.exe is run directly
- *
  * @param hwndParent Parent window handle
  * @param isRunning Whether Browser Sanity is currently running
  * @param isInstalled Whether Browser Sanity is installed
@@ -199,27 +259,9 @@ int ShowManualLaunchDialog(HWND hwndParent, BOOL isRunning, BOOL isInstalled, DW
 
 /**
  * @brief Shows the main settings configuration dialog
- *
  * @param hwndParent Parent window handle
  * @return Dialog result (IDOK if settings were saved, IDCANCEL if cancelled)
  */
 int ShowMainSettingsDialog(HWND hwndParent);
-
-/**
- * @brief Shows the install/uninstall progress dialog
- *
- * @param hwndParent Parent window handle
- * @param isInstall TRUE for install, FALSE for uninstall
- * @return Dialog result
- */
-int ShowInstallUninstallProgressDialog(HWND hwndParent, BOOL isInstall);
-
-/**
- * @brief Shows the installation information dialog when Browser Sanity is not found
- *
- * @param hwndParent Parent window handle
- * @return Dialog result (IDYES = Install, IDNO = Cancel)
- */
-int ShowInstallationInfoDialog(HWND hwndParent);
 
 #endif /* BROWSER_SANITY_H */

@@ -100,6 +100,14 @@ echo MSVC environment configured successfully
 
 :build_solution
 echo.
+echo Terminating any running BrowserSanity processes...
+taskkill /F /IM BrowserSanity.exe /T 3 >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo BrowserSanity.exe processes terminated
+) else (
+    echo No BrowserSanity.exe processes found
+)
+echo.
 echo Building Browser Sanity solution...
 echo.
 
