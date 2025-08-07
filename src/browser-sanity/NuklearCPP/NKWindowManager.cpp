@@ -27,8 +27,8 @@
 #include <set>
 
 NKWindowManager::NKWindowManager()
-    : m_font(nullptr), m_initialized(false), m_focusedWindow(nullptr), m_activeWindow(nullptr) {
-    memset(&m_ctx, 0, sizeof(m_ctx));
+    : m_initialized(false), m_focusedWindow(nullptr), m_activeWindow(nullptr) {
+    // ✅ NO SHARED CONTEXT - each window has its own
 }
 
 NKWindowManager::~NKWindowManager() {
@@ -38,82 +38,17 @@ NKWindowManager::~NKWindowManager() {
 void NKWindowManager::Initialize() {
     if (m_initialized) return;
     
-    InitializeNuklearContext();
-    ApplyTheme();
+    // ✅ NO SHARED CONTEXT INITIALIZATION - each window initializes its own
     m_initialized = true;
 }
 
-void NKWindowManager::InitializeNuklearContext() {
-    // Initialize font atlas
-    struct nk_font_atlas atlas;
-    nk_font_atlas_init_default(&atlas);
-    nk_font_atlas_begin(&atlas);
-    
-    // Add default font with 16pt size for DPI scaling
-    m_font = nk_font_atlas_add_default(&atlas, 16, 0);
-    
-    // Bake the font atlas
-    const void *image;
-    int atlas_w, atlas_h;
-    image = nk_font_atlas_bake(&atlas, &atlas_w, &atlas_h, NK_FONT_ATLAS_RGBA32);
-    
-    // End atlas (no GPU upload needed for GDI)
-    nk_font_atlas_end(&atlas, nk_handle_ptr(0), NULL);
-    
-    // Initialize context with font
-    nk_init_default(&m_ctx, &m_font->handle);
-}
+// ✅ REMOVED: Shared context initialization moved to individual windows
 
-void NKWindowManager::ApplyTheme() {
-    // Apply light theme colors
-    struct nk_color table[NK_COLOR_COUNT];
-    table[NK_COLOR_TEXT] = NK_THEME_TEXT;
-    table[NK_COLOR_WINDOW] = NK_THEME_WINDOW;
-    table[NK_COLOR_HEADER] = NK_THEME_HEADER;
-    table[NK_COLOR_BORDER] = NK_THEME_BORDER;
-    table[NK_COLOR_BUTTON] = nk_rgb(220, 220, 220);           // Medium gray - inactive button background
-    table[NK_COLOR_BUTTON_HOVER] = nk_rgb(200, 200, 200);     // Darker gray - button hover state
-    table[NK_COLOR_BUTTON_ACTIVE] = NK_THEME_BUTTON_ACTIVE;
-    table[NK_COLOR_TOGGLE] = NK_THEME_TOGGLE;
-    table[NK_COLOR_TOGGLE_HOVER] = NK_THEME_TOGGLE_HOVER;
-    table[NK_COLOR_TOGGLE_CURSOR] = NK_THEME_TOGGLE_CURSOR;
-    table[NK_COLOR_SELECT] = NK_THEME_SELECT;
-    table[NK_COLOR_SELECT_ACTIVE] = NK_THEME_SELECT_ACTIVE;
-    table[NK_COLOR_SLIDER] = NK_THEME_SLIDER;
-    table[NK_COLOR_SLIDER_CURSOR] = NK_THEME_SLIDER_CURSOR;
-    table[NK_COLOR_SLIDER_CURSOR_HOVER] = NK_THEME_SLIDER_CURSOR_HOVER;
-    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = NK_THEME_SLIDER_CURSOR_ACTIVE;
-    table[NK_COLOR_PROPERTY] = NK_THEME_PROPERTY;
-    table[NK_COLOR_EDIT] = NK_THEME_EDIT;
-    table[NK_COLOR_EDIT_CURSOR] = NK_THEME_EDIT_CURSOR;
-    table[NK_COLOR_COMBO] = NK_THEME_COMBO;
-    table[NK_COLOR_CHART] = NK_THEME_CHART;
-    table[NK_COLOR_CHART_COLOR] = NK_THEME_CHART_COLOR;
-    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = NK_THEME_CHART_COLOR_HIGHLIGHT;
-    table[NK_COLOR_SCROLLBAR] = NK_THEME_SCROLLBAR;
-    table[NK_COLOR_SCROLLBAR_CURSOR] = NK_THEME_SCROLLBAR_CURSOR;
-    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = NK_THEME_SCROLLBAR_CURSOR_HOVER;
-    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = NK_THEME_SCROLLBAR_CURSOR_ACTIVE;
-    table[NK_COLOR_TAB_HEADER] = NK_THEME_TAB_HEADER;
-    
-    // Apply the color table to the context
-    nk_style_from_table(&m_ctx, table);
-    
-    // Additional style tweaks for better appearance
-    m_ctx.style.window.border = 2.0f;                           // 2px borders for visibility
-    m_ctx.style.window.rounding = 6.0f;                         // 6px rounded corners
-    m_ctx.style.window.border_color = nk_rgb(160, 160, 160);    // Medium-dark gray - window borders
-    m_ctx.style.button.border = 2.0f;                           // 2px button borders for visibility
-    m_ctx.style.button.rounding = 4.0f;                         // 4px rounded button corners
-    m_ctx.style.button.border_color = nk_rgb(160, 160, 160);    // Medium-dark gray - button borders
-    m_ctx.style.edit.border = 1.0f;                             // 1px input field borders
-    m_ctx.style.edit.rounding = 4.0f;                           // 4px rounded input corners
-    m_ctx.style.edit.border_color = NK_THEME_BORDER;            // Use theme border color
-}
+// ✅ REMOVED: Theme application moved to individual windows
 
 void NKWindowManager::Cleanup() {
     if (m_initialized) {
-        nk_free(&m_ctx);
+        // ✅ NO SHARED CONTEXT TO CLEANUP - each window cleans up its own
         m_initialized = false;
     }
 }
@@ -229,13 +164,7 @@ void NKWindowManager::UpdateAll() {
     // DebugLog("UpdateAll: Context-per-window update cycle complete");
 }
 
-void NKWindowManager::BeginInput() {
-    nk_input_begin(&m_ctx);
-}
-
-void NKWindowManager::EndInput() {
-    nk_input_end(&m_ctx);
-}
+// ✅ REMOVED: Input processing moved to individual windows
 
 void NKWindowManager::ProcessInput(HWND hwndMessageReceiver, UINT msg, WPARAM wparam, LPARAM lparam) {
     // Determine target window for this input event
@@ -288,119 +217,11 @@ void NKWindowManager::ProcessInput(HWND hwndMessageReceiver, UINT msg, WPARAM wp
     }
 }
 
-void NKWindowManager::ProcessInputEventForWindow(HWND hwndNuklearReceiver, const InputEvent& event) {    
-    UINT msg = event.msg;
-    WPARAM wparam = event.wparam;
-    LPARAM lparam = event.lparam;
-
-    // Events are already filtered by ShouldReceiveInput() in UpdateAll() before reaching here
-
-    
-    switch (msg) {
-        case WM_KEYDOWN:
-        case WM_KEYUP: {
-            int down = (msg == WM_KEYDOWN);
-            int ctrl = GetKeyState(VK_CONTROL) & 0x8000;
-            
-            switch (wparam) {
-                case VK_SHIFT:
-                case VK_LSHIFT:
-                case VK_RSHIFT:
-                    nk_input_key(&m_ctx, NK_KEY_SHIFT, down);
-                    break;
-                case VK_DELETE:
-                    nk_input_key(&m_ctx, NK_KEY_DEL, down);
-                    break;
-                case VK_RETURN:
-                    nk_input_key(&m_ctx, NK_KEY_ENTER, down);
-                    break;
-                case VK_TAB:
-                    nk_input_key(&m_ctx, NK_KEY_TAB, down);
-                    break;
-                case VK_LEFT:
-                    if (ctrl) nk_input_key(&m_ctx, NK_KEY_TEXT_WORD_LEFT, down);
-                    else nk_input_key(&m_ctx, NK_KEY_LEFT, down);
-                    break;
-                case VK_RIGHT:
-                    if (ctrl) nk_input_key(&m_ctx, NK_KEY_TEXT_WORD_RIGHT, down);
-                    else nk_input_key(&m_ctx, NK_KEY_RIGHT, down);
-                    break;
-                case VK_BACK:
-                    nk_input_key(&m_ctx, NK_KEY_BACKSPACE, down);
-                    break;
-                case VK_HOME:
-                    nk_input_key(&m_ctx, NK_KEY_TEXT_START, down);
-                    break;
-                case VK_END:
-                    nk_input_key(&m_ctx, NK_KEY_TEXT_END, down);
-                    break;
-                case 'A':
-                    if (ctrl && down) {
-                        nk_input_key(&m_ctx, NK_KEY_TEXT_SELECT_ALL, 1);
-                    }
-                    break;
-                case 'C':
-                    if (ctrl && down) {
-                        nk_input_key(&m_ctx, NK_KEY_COPY, 1);
-                    }
-                    break;
-                case 'V':
-                    if (ctrl && down) {
-                        nk_input_key(&m_ctx, NK_KEY_PASTE, 1);
-                    }
-                    break;
-                case 'X':
-                    if (ctrl && down) {
-                        nk_input_key(&m_ctx, NK_KEY_CUT, 1);
-                    }
-                    break;
-            }
-            break;
-        }
-        case WM_CHAR:
-            if (wparam >= 32) {
-                nk_input_unicode(&m_ctx, (nk_rune)wparam);
-            }
-            break;
-        case WM_LBUTTONDOWN: {
-            int x = GET_X_LPARAM(lparam);
-            int y = GET_Y_LPARAM(lparam);
-            // Left mouse button down processed
-            SetCapture(hwndNuklearReceiver);
-            nk_input_button(&m_ctx, NK_BUTTON_LEFT, x, y, 1);
-            break;
-        }
-        case WM_LBUTTONUP: {
-            int x = GET_X_LPARAM(lparam);
-            int y = GET_Y_LPARAM(lparam);
-            // Left mouse button up processed
-            ReleaseCapture();
-            nk_input_button(&m_ctx, NK_BUTTON_LEFT, x, y, 0);
-            break;
-        }
-        case WM_RBUTTONDOWN: {
-            int x = GET_X_LPARAM(lparam);
-            int y = GET_Y_LPARAM(lparam);
-            // Right mouse button down processed
-            SetCapture(hwndNuklearReceiver);
-            nk_input_button(&m_ctx, NK_BUTTON_RIGHT, x, y, 1);
-            break;
-        }
-        case WM_RBUTTONUP: {
-            int x = GET_X_LPARAM(lparam);
-            int y = GET_Y_LPARAM(lparam);
-            // Right mouse button up processed
-            ReleaseCapture();
-            nk_input_button(&m_ctx, NK_BUTTON_RIGHT, x, y, 0);
-            break;
-        }
-        case WM_MOUSEMOVE:
-            nk_input_motion(&m_ctx, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam));
-            break;
-        case WM_MOUSEWHEEL:
-            nk_input_scroll(&m_ctx, nk_vec2(0, (float)(short)HIWORD(wparam) / WHEEL_DELTA));
-            break;
-    }
+// 🚨 CRITICAL BUG FIX: This function was using the wrong context!
+// This function is now DEPRECATED - input processing moved to NKWindow::ProcessInputEventForWindow()
+// to ensure input goes to the correct window's context
+void NKWindowManager::ProcessInputEventForWindow(HWND hwndNuklearReceiver, const InputEvent& event) {
+    DebugLog("ERROR: ProcessInputEventForWindow in NKWindowManager should not be called - use NKWindow::ProcessInputEventForWindow instead");
 }
 
 HWND NKWindowManager::GetWindowUnderCursor() {

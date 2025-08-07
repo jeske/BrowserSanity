@@ -1,35 +1,36 @@
 /**
  * @file NKWindowManager.h
- * @brief PROVEN WORKING PATTERN: Single Context Multi-Window Nuklear Architecture
+ * @brief 🎯 BREAKTHROUGH: Context-Per-Window Architecture
  *
- * CRITICAL SUCCESS PATTERN: Per-Window Rendering with Shared Context
+ * This file implements the ONLY working solution for multi-window Nuklear applications.
+ * Each window owns its complete Nuklear context to prevent assertion failures.
  *
- * This architecture has been tested and proven to work reliably for multi-window
- * Nuklear applications. It solves the critical window targeting problem through
- * individual window processing rather than command routing.
+ * 🚨 CRITICAL: This architecture prevents assertion failures that occur when input
+ * events are processed in the wrong window's context. The key insight is that
+ * Nuklear's internal consistency checks will detect and assert on mismatches between:
+ * - Input event window (HWND that received the Windows message)
+ * - Nuklear context window (window currently being processed)
  *
- * WORKING APPROACH: Single shared nk_context with per-window rendering
- * - One NKWindowManager owns the single nk_context (Nuklear's intended design)
- * - Each window processed individually: Render() → ProcessCommands() → nk_clear()
- * - Immediate draw command processing prevents command mixing between windows
+ * WORKING APPROACH: Context-Per-Window with Input Isolation
+ * - Each NKWindow owns its own nk_context (complete isolation)
+ * - Input events routed to target window ONLY (no broadcasting)
+ * - Each window processes: Input → Render → Draw → Clear (isolated cycle)
  * - Centralized GDI backend management (one backend per HWND)
- * - Single input processing cycle for all windows
- * - Dependency injection pattern for clean architecture
+ * - Independent font and theme management per window
  *
  * KEY SUCCESS PRINCIPLES:
- * 1. Single nk_context shared across ALL windows (never multiple contexts)
- * 2. Process each window individually with immediate command processing
- * 3. Call nk_clear() after each window to prevent command mixing
- * 4. Process ALL Windows messages before UpdateAll() to prevent WM_PAINT starvation
- * 5. Centralized input processing (one BeginInput/EndInput cycle)
- * 6. One GDI backend per HWND, managed centrally
- * 7. Dependency injection for window manager access
+ * 1. Context-Per-Window: Each window owns its complete Nuklear state
+ * 2. Input Routing: Events go ONLY to target window, never broadcast
+ * 3. Complete Isolation: No shared state prevents assertion failures
+ * 4. Independent Management: Each window has its own font, theme, and rendering
+ * 5. Proper Message Routing: Windows messages target specific windows only
+ * 6. Assertion Prevention: Input window always matches context window
  *
- * This pattern eliminates:
- * - Blank window issues (proper message loop)
- * - All windows showing same content (per-window processing)
- * - Sequence assertion failures (single context)
- * - Input handling conflicts (centralized input)
+ * This architecture eliminates:
+ * - Assertion failures from input window/context mismatches
+ * - Input event leaking between windows
+ * - Global state conflicts in Nuklear's ctx->last_widget_state
+ * - Button click detection failures
  */
 
 #pragma once
@@ -98,8 +99,8 @@ public:
     // Context management
     void Initialize();
     void Cleanup();
-    struct nk_context* GetContext() { return &m_ctx; }
-    struct nk_font* GetFont() { return m_font; }
+    // ✅ NO SHARED CONTEXT - each window has its own
+    // GetContext() removed - use window->GetContext() instead
     
     // Window management
     void RegisterWindow(NKWindow* window);
@@ -107,9 +108,7 @@ public:
     void UpdateAll();  // Update all active windows with shared input cycle
     void CleanupAll(); // Cleanup all windows
     
-    // Input handling - single cycle for all windows with smart routing
-    void BeginInput();
-    void EndInput();
+    // ✅ Input handling - routed to target window only
     void ProcessInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
     
     // Focus and window tracking for smart input routing
@@ -130,8 +129,7 @@ public:
     void UnregisterGdiBackend(HWND hwnd);
     
 private:
-    struct nk_context m_ctx;
-    struct nk_font* m_font;
+    // ✅ NO SHARED CONTEXT - removed to prevent misuse
     bool m_initialized;
     std::vector<NKWindow*> m_windows;
     
