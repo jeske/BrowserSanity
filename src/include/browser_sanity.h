@@ -14,6 +14,10 @@
 #include <shellapi.h>
 #include "msedge_redirect.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Registry keys and values used by BrowserSanity
  */
@@ -263,5 +267,9 @@ int ShowManualLaunchDialog(HWND hwndParent, BOOL isRunning, BOOL isInstalled, DW
  * @return Dialog result (IDOK if settings were saved, IDCANCEL if cancelled)
  */
 int ShowMainSettingsDialog(HWND hwndParent);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BROWSER_SANITY_H */

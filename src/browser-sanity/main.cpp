@@ -33,11 +33,11 @@
  * Nuklear applications with proper input handling and unique window content.
  */
 
-#include "../../include/NKWindow.h"
-#include "../../include/NKWindowManager.h"
-#include "../../include/browser_sanity.h"
-#include "../../include/main.h"
-#include "../../include/debug_log.h"
+#include <NKWindow.h>
+#include <NKWindowManager.h>
+#include <browser_sanity.h>
+#include <main.h>
+#include <debug_log.h>
 #include <memory>
 
 // Global application state definition
@@ -122,12 +122,11 @@ bool InitializeWindows(NKWindowManager& windowManager) {
 
 // Show initial windows
 void ShowInitialWindows(int nCmdShow) {
-    // Show main window
+    // Show only the main install/uninstall dialog at startup
     g_app.mainWindow->ShowWindow(nCmdShow);
     
-    // Show all windows for demonstration (normally settings and toast would be hidden)
-    g_app.settingsWindow->ShowWindow(nCmdShow);
-    g_app.toastWindow->ShowWindow(nCmdShow);
+    // Keep settings and toast windows hidden initially
+    // They will be shown when requested by user actions
 }
 
 // Main message loop with C++ window management

@@ -3,10 +3,10 @@
  * @brief Implementation of window manager with shared Nuklear context
  */
 
-#include "../../include/NKWindowManager.h"
-#include "../../include/NKWindow.h"
-#include "../../include/main.h"
-#include "../../include/debug_log.h"
+#include <NKWindowManager.h>
+#include <NKWindow.h>
+#include <main.h>
+#include <debug_log.h>
 #include <windowsx.h>
 #include <algorithm>
 #include <set>

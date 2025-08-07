@@ -3,7 +3,7 @@
  * @brief Watchdog action implementation
  */
 
-#include "../../../include/browser_sanity.h"
+#include <browser_sanity.h>
 #include <windows.h>
 
 // External functions from watchdog.c

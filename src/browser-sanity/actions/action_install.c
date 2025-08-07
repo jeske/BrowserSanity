@@ -3,7 +3,9 @@
  * @brief Installation action implementation
  */
 
-#include "../../../include/browser_sanity.h"
+#include <browser_sanity.h>
+#include <debug_log.h>
+#include <safe_strings.h>
 #include <windows.h>
 #include <shellapi.h>
 #include <shlwapi.h>
@@ -28,12 +30,15 @@ static BOOL CreateShortcut(const char* shortcutPath, const char* targetPath,
     IPersistFile* ppf;
     WCHAR wszShortcutPath[MAX_PATH];
     
+    DebugLogInfo("Creating shortcut: %s -> %s", shortcutPath, targetPath);
+    
     // Initialize COM
     CoInitialize(NULL);
     
     // Create the IShellLink interface
     if (FAILED(CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
                                &IID_IShellLink, (void**)&psl))) {
+        DebugLogError("Failed to create IShellLink interface");
         CoUninitialize();
         return FALSE;
     }
@@ -51,6 +56,7 @@ static BOOL CreateShortcut(const char* shortcutPath, const char* targetPath,
     
     // Query for the IPersistFile interface
     if (FAILED(psl->lpVtbl->QueryInterface(psl, &IID_IPersistFile, (void**)&ppf))) {
+        DebugLogError("Failed to query IPersistFile interface");
         psl->lpVtbl->Release(psl);
         CoUninitialize();
         return FALSE;
@@ -61,6 +67,7 @@ static BOOL CreateShortcut(const char* shortcutPath, const char* targetPath,
     
     // Save the shortcut
     if (FAILED(ppf->lpVtbl->Save(ppf, wszShortcutPath, TRUE))) {
+        DebugLogError("Failed to save shortcut to: %s", shortcutPath);
         ppf->lpVtbl->Release(ppf);
         psl->lpVtbl->Release(psl);
         CoUninitialize();
@@ -74,6 +81,7 @@ static BOOL CreateShortcut(const char* shortcutPath, const char* targetPath,
     // Uninitialize COM
     CoUninitialize();
     
+    DebugLogInfo("Shortcut created successfully: %s", shortcutPath);
     return TRUE;
 }
 
@@ -91,58 +99,98 @@ BOOL InstallApplication() {
     char shortcutPath[MAX_PATH];
     AppConfig config;
     
+    DebugLogInfo("=== Starting Browser Sanity Installation ===");
+    
     // Get the path of the current executable
     if (GetModuleFileName(NULL, exePath, MAX_PATH) == 0) {
+        DebugLogError("Failed to get current executable path");
         return FALSE;
     }
+    DebugLogInfo("Current executable path: %s", exePath);
     
     // Create the installation directory
-    sprintf(installDir, "%s\\Browser Sanity", getenv("ProgramFiles(x86)"));
+    if (sprintf_s(installDir, MAX_PATH, "%s\\Browser Sanity", getenv("ProgramFiles(x86)")) != 0) {
+        DebugLogError("Failed to format installation directory path");
+        return FALSE;
+    }
+    DebugLogInfo("Creating installation directory: %s", installDir);
     if (!CreateDirectory(installDir, NULL) && GetLastError() != ERROR_ALREADY_EXISTS) {
+        DebugLogError("Failed to create installation directory: %s", installDir);
         return FALSE;
     }
     
     // Create the installation path
-    sprintf(installPath, "%s\\BrowserSanity.exe", installDir);
-    
-    // Copy the executable to the installation directory
-    if (!CopyFile(exePath, installPath, FALSE)) {
+    if (sprintf_s(installPath, MAX_PATH, "%s\\BrowserSanity.exe", installDir) != 0) {
+        DebugLogError("Failed to format installation path");
         return FALSE;
     }
+    DebugLogInfo("Installation path: %s", installPath);
+    
+    // Copy the executable to the installation directory
+    DebugLogInfo("Copying executable from %s to %s", exePath, installPath);
+    if (!CopyFile(exePath, installPath, FALSE)) {
+        DebugLogError("Failed to copy executable to installation directory");
+        return FALSE;
+    }
+    DebugLogInfo("Executable copied successfully");
     
     // Get the desktop path
     SHGetFolderPath(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, desktopPath);
+    DebugLogInfo("Desktop path: %s", desktopPath);
     
     // Create the desktop shortcut
-    sprintf(shortcutPath, "%s\\Browser Sanity.lnk", desktopPath);
-    CreateShortcut(shortcutPath, installPath, "Browser Sanity", installPath, 0);
+    if (sprintf_s(shortcutPath, MAX_PATH, "%s\\Browser Sanity.lnk", desktopPath) != 0) {
+        DebugLogError("Failed to format desktop shortcut path");
+    } else if (!CreateShortcut(shortcutPath, installPath, "Browser Sanity", installPath, 0)) {
+        DebugLogError("Failed to create desktop shortcut");
+        // Continue installation even if shortcut creation fails
+    }
     
     // Get the start menu path
     SHGetFolderPath(NULL, CSIDL_PROGRAMS, NULL, 0, startMenuPath);
+    DebugLogInfo("Start menu path: %s", startMenuPath);
     
     // Create the start menu directory
-    sprintf(shortcutPath, "%s\\Browser Sanity", startMenuPath);
-    CreateDirectory(shortcutPath, NULL);
+    if (sprintf_s(shortcutPath, MAX_PATH, "%s\\Browser Sanity", startMenuPath) != 0) {
+        DebugLogError("Failed to format start menu directory path");
+    } else {
+        DebugLogInfo("Creating start menu directory: %s", shortcutPath);
+        CreateDirectory(shortcutPath, NULL);
+    }
     
     // Create the start menu shortcut
-    sprintf(shortcutPath, "%s\\Browser Sanity\\Browser Sanity.lnk", startMenuPath);
-    CreateShortcut(shortcutPath, installPath, "Browser Sanity", installPath, 0);
+    if (sprintf_s(shortcutPath, MAX_PATH, "%s\\Browser Sanity\\Browser Sanity.lnk", startMenuPath) != 0) {
+        DebugLogError("Failed to format start menu shortcut path");
+    } else if (!CreateShortcut(shortcutPath, installPath, "Browser Sanity", installPath, 0)) {
+        DebugLogError("Failed to create start menu shortcut");
+        // Continue installation even if shortcut creation fails
+    }
     
     // Update the configuration
+    DebugLogInfo("Updating application configuration");
     ReadAppConfig(&config);
     strcpy(config.installPath, installDir);
     strcpy(config.version, BROWSER_SANITY_VERSION);
     config.isInstalled = TRUE;
     WriteAppConfig(&config);
+    DebugLogInfo("Configuration updated successfully");
     
     // Set to run at startup if enabled
     if (config.runAtStartup) {
+        DebugLogInfo("Setting application to run at startup");
         SetRunAtStartup(TRUE);
     }
     
     // Install the redirector
-    InstallRedirector();
+    DebugLogInfo("Installing browser redirector");
+    if (InstallRedirector()) {
+        DebugLogInfo("Browser redirector installed successfully");
+    } else {
+        DebugLogError("Failed to install browser redirector");
+        // Continue installation even if redirector fails
+    }
     
+    DebugLogInfo("=== Browser Sanity Installation Complete ===");
     return TRUE;
 }
 
@@ -165,7 +213,10 @@ BOOL LaunchInstalledApplication() {
     }
     
     // Create the installation path
-    sprintf(installPath, "%s\\BrowserSanity.exe", config.installPath);
+    if (sprintf_s(installPath, MAX_PATH, "%s\\BrowserSanity.exe", config.installPath) != 0) {
+        DebugLogError("Failed to format installation path for launch");
+        return FALSE;
+    }
     
     // Launch the application
     ZeroMemory(&si, sizeof(si));
@@ -187,12 +238,17 @@ BOOL LaunchInstalledApplication() {
  * @return Exit code
  */
 int RunInstallerAction() {
+    DebugLogInfo("Running installer action");
+    
     // Check if we need to elevate
     if (!IsUserAnAdmin()) {
         char exePath[MAX_PATH];
         
+        DebugLogInfo("Elevation required - requesting administrator privileges");
+        
         // Get the path of the current executable
         if (GetModuleFileName(NULL, exePath, MAX_PATH) == 0) {
+            DebugLogError("Failed to get executable path for elevation");
             return 1;
         }
         
@@ -206,23 +262,30 @@ int RunInstallerAction() {
         sei.nShow = SW_NORMAL;
         
         if (!ShellExecuteEx(&sei)) {
+            DebugLogError("Failed to elevate privileges");
             MessageBox(NULL, "Failed to elevate privileges.", "Browser Sanity", MB_OK | MB_ICONERROR);
             return 1;
         }
         
+        DebugLogInfo("Elevation request sent successfully");
         return 0;
     }
     
+    DebugLogInfo("Running with administrator privileges");
+    
     // Install the application
     if (!InstallApplication()) {
+        DebugLogError("Installation failed");
         MessageBox(NULL, "Failed to install Browser Sanity.", "Browser Sanity", MB_OK | MB_ICONERROR);
         return 1;
     }
     
     // Show success message
+    DebugLogInfo("Installation completed successfully");
     MessageBox(NULL, "Browser Sanity has been installed successfully.", "Browser Sanity", MB_OK | MB_ICONINFORMATION);
     
     // Launch the installed application
+    DebugLogInfo("Launching installed application");
     LaunchInstalledApplication();
     
     return 0;

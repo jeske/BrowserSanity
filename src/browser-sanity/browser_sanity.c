@@ -3,7 +3,9 @@
  * @brief Implementation of the BrowserSanity core functionality
  */
 
-#include "browser_sanity.h"
+#include <browser_sanity.h>
+#include <safe_strings.h>
+#include <debug_log.h>
 #include <shlwapi.h>
 #include <shlobj.h>
 #include <tlhelp32.h>
@@ -27,7 +29,10 @@ BOOL ReadAppConfig(AppConfig* config) {
     config->runAtStartup = FALSE;
     config->watchdogEnabled = TRUE;
     config->watchdogInterval = DEFAULT_WATCHDOG_INTERVAL;
-    strcpy(config->version, BROWSER_SANITY_VERSION);
+    if (strncpy_s(config->version, sizeof(config->version), BROWSER_SANITY_VERSION, _TRUNCATE) != 0) {
+        DebugLogError("Failed to copy version string");
+        config->version[0] = '\0';
+    }
     config->installPath[0] = '\0';
     
     // Read redirect configuration
@@ -155,8 +160,14 @@ BOOL IsRunningFromInstallDir() {
     }
     
     // Combine the installation path with the executable name
-    strcpy(installPath, config.installPath);
-    strcat(installPath, "\\BrowserSanity.exe");
+    if (strncpy_s(installPath, MAX_PATH, config.installPath, _TRUNCATE) != 0) {
+        DebugLogError("Failed to copy install path");
+        return FALSE;
+    }
+    if (strcat_s(installPath, MAX_PATH, "\\BrowserSanity.exe") != 0) {
+        DebugLogError("Failed to append executable name to install path");
+        return FALSE;
+    }
     
     // Compare the paths
     return (_stricmp(exePath, installPath) == 0);
@@ -172,7 +183,10 @@ BOOL IsRedirectorInstalled() {
     DWORD attributes;
     
     // Get the path to the Edge executable
-    sprintf(edgePath, "%s\\Microsoft\\Edge\\Application\\msedge.exe", getenv("ProgramFiles(x86)"));
+    if (sprintf_s(edgePath, MAX_PATH, "%s\\Microsoft\\Edge\\Application\\msedge.exe", getenv("ProgramFiles(x86)")) < 0) {
+        DebugLogError("Failed to format Edge executable path");
+        return FALSE;
+    }
     
     // Check if the file exists
     attributes = GetFileAttributes(edgePath);
@@ -195,10 +209,16 @@ BOOL InstallRedirector() {
     char backupPath[MAX_PATH];
     
     // Get the path to the Edge executable
-    sprintf(edgePath, "%s\\Microsoft\\Edge\\Application\\msedge.exe", getenv("ProgramFiles(x86)"));
+    if (sprintf_s(edgePath, MAX_PATH, "%s\\Microsoft\\Edge\\Application\\msedge.exe", getenv("ProgramFiles(x86)")) < 0) {
+        DebugLogError("Failed to format Edge executable path");
+        return FALSE;
+    }
     
     // Create backup path
-    sprintf(backupPath, "%s\\Microsoft\\Edge\\Application\\msedge.exe.original", getenv("ProgramFiles(x86)"));
+    if (sprintf_s(backupPath, MAX_PATH, "%s\\Microsoft\\Edge\\Application\\msedge.exe.original", getenv("ProgramFiles(x86)")) < 0) {
+        DebugLogError("Failed to format backup path");
+        return FALSE;
+    }
     
     // Check if the backup already exists
     if (GetFileAttributes(backupPath) == INVALID_FILE_ATTRIBUTES) {
@@ -226,10 +246,16 @@ BOOL UninstallRedirector() {
     char backupPath[MAX_PATH];
     
     // Get the path to the Edge executable
-    sprintf(edgePath, "%s\\Microsoft\\Edge\\Application\\msedge.exe", getenv("ProgramFiles(x86)"));
+    if (sprintf_s(edgePath, MAX_PATH, "%s\\Microsoft\\Edge\\Application\\msedge.exe", getenv("ProgramFiles(x86)")) < 0) {
+        DebugLogError("Failed to format Edge executable path");
+        return FALSE;
+    }
     
     // Create backup path
-    sprintf(backupPath, "%s\\Microsoft\\Edge\\Application\\msedge.exe.original", getenv("ProgramFiles(x86)"));
+    if (sprintf_s(backupPath, MAX_PATH, "%s\\Microsoft\\Edge\\Application\\msedge.exe.original", getenv("ProgramFiles(x86)")) < 0) {
+        DebugLogError("Failed to format backup path");
+        return FALSE;
+    }
     
     // Check if the backup exists
     if (GetFileAttributes(backupPath) != INVALID_FILE_ATTRIBUTES) {
@@ -363,7 +389,6 @@ BOOL IsProcessRunningWithPID(DWORD* outPID) {
 BOOL IsComprehensivelyInstalled() {
     AppConfig config;
     char installPath[MAX_PATH];
-    char exePath[MAX_PATH];
     
     // 1. Registry check
     ReadAppConfig(&config);
@@ -372,7 +397,10 @@ BOOL IsComprehensivelyInstalled() {
     }
     
     // 2. Path check - verify the executable exists in the install directory
-    sprintf(installPath, "%s\\BrowserSanity.exe", config.installPath);
+    if (sprintf_s(installPath, MAX_PATH, "%s\\BrowserSanity.exe", config.installPath) < 0) {
+        DebugLogError("Failed to format install path for verification");
+        return FALSE;
+    }
     if (GetFileAttributes(installPath) == INVALID_FILE_ATTRIBUTES) {
         return FALSE;
     }
@@ -410,8 +438,11 @@ BOOL ShowToastNotification(const char* title, const char* message, const char** 
     // TODO: Implement toast notifications using Windows API
     
     // For now, just show a message box
-    char fullMessage[1024];
-    sprintf(fullMessage, "%s\n\n%s", title, message);
+    char fullMessage[MESSAGE_SIZE];
+    if (sprintf_s(fullMessage, MESSAGE_SIZE, "%s\n\n%s", title, message) < 0) {
+        DebugLogError("Failed to format toast message");
+        return FALSE;
+    }
     MessageBox(NULL, fullMessage, "Browser Sanity", MB_OK | MB_ICONINFORMATION);
     
     return TRUE;

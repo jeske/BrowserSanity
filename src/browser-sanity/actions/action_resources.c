@@ -3,8 +3,8 @@
  * @brief Resource extraction utilities for Browser Sanity actions
  */
 
-#include "../../../include/browser_sanity.h"
-#include "../../../include/resource.h"
+#include <browser_sanity.h>
+#include <resource.h>
 #include <windows.h>
 
 /**

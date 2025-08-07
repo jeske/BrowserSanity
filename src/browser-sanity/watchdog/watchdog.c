@@ -3,7 +3,7 @@
  * @brief Implementation of the watchdog functionality
  */
 
-#include "browser_sanity.h"
+#include <browser_sanity.h>
 #include <process.h>
 
 // Global variables

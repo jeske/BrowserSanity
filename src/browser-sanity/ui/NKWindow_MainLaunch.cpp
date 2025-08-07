@@ -3,10 +3,24 @@
  * @brief Main launch dialog window implementation
  */
 
-#include "../../../include/NKWindow.h"
-#include "../../../include/NKWindowManager.h"
-#include "../../../include/browser_sanity.h"
-#include "../../../include/debug_log.h"
+#include <NKWindow.h>
+#include <NKWindowManager.h>
+#include <browser_sanity.h>
+#include <safe_strings.h>
+#include <debug_log.h>
+
+// C linkage for Browser Sanity functions
+extern "C" {
+    #include <browser_sanity.h>
+    // Forward declaration for full installation function
+    BOOL InstallApplication();
+    BOOL UninstallApplication();
+}
+
+// Forward declarations for inter-window communication functions
+extern "C" void ShowSettingsWindow();
+extern "C" void ShowToastNotificationCpp(const char* title, const char* message);
+extern "C" void ExitApplication();
 
 /**
  * @brief Main launch dialog window class
@@ -17,9 +31,14 @@ public:
     NKWindow_MainLaunch(NKWindowManager& windowManager) : NKWindow(windowManager, "Browser Sanity - Main Control", 480, 500) {
         // Initialize main launch specific state
         m_browserRunning = false;
-        m_isInstalled = true;
+        m_isInstalled = false;
         m_runningPID = 0;
-        strcpy(m_statusMessage, "Ready");
+        if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Checking status...", _TRUNCATE) != 0) {
+            m_statusMessage[0] = '\0';
+        }
+        
+        // Initialize configuration
+        memset(&m_config, 0, sizeof(m_config));
         
         // Use theme background color
         SetBackgroundColor(248, 248, 248); // NK_THEME_OS_WINDOW_BG
@@ -35,22 +54,23 @@ public:
     nk_bool m_browserRunning;
     nk_bool m_isInstalled;
     DWORD m_runningPID;
-    char m_statusMessage[256];
+    char m_statusMessage[MESSAGE_SIZE];
+    AppConfig m_config;
     
     // UI state
     int m_selectedBrowser = 0;  // 0=Chrome, 1=Firefox, 2=Edge
     nk_bool m_runAtStartup = nk_true;
-    char m_redirectUrl[512] = "https://www.google.com";
+    char m_redirectUrl[URL_SIZE] = "https://www.google.com";
     
     virtual void Render() override {
         DebugLog("MainLaunch: Starting render for HWND %p", (void*)GetHWND());
         struct nk_context* ctx = GetContext();
         
         // Create unique window name using HWND to avoid conflicts
-        char windowName[256];
+        char windowName[MESSAGE_SIZE];
         snprintf(windowName, sizeof(windowName), "Browser Sanity - Main Control##%p", (void*)GetHWND());
         
-        if (nk_begin(ctx, windowName, nk_rect(10, 10, GetWidth() - 20, GetHeight() - 20),
+        if (nk_begin(ctx, windowName, nk_rect(10.0f, 10.0f, (float)(GetWidth() - 20), (float)(GetHeight() - 20)),
                      NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_TITLE)) {
             DebugLog("MainLaunch: nk_begin successful, building UI");
             
@@ -87,13 +107,17 @@ public:
             // Action buttons with spacing
             nk_layout_row_dynamic(ctx, 40, 2);
             if (nk_button_label(ctx, "Show Settings")) {
-                // TODO: Show settings window
-                strcpy(m_statusMessage, "Settings clicked");
+                ShowSettingsWindow();
+                if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Settings window opened", _TRUNCATE) != 0) {
+                    m_statusMessage[0] = '\0';
+                }
             }
             
             if (nk_button_label(ctx, "Show Toast")) {
-                // TODO: Show toast window
-                strcpy(m_statusMessage, "Toast clicked");
+                ShowToastNotificationCpp("Test Notification", "This is a test toast notification from Browser Sanity!");
+                if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Toast notification shown", _TRUNCATE) != 0) {
+                    m_statusMessage[0] = '\0';
+                }
             }
             
             // Add spacing
@@ -140,15 +164,33 @@ public:
             // Control buttons with better spacing
             nk_layout_row_dynamic(ctx, 40, 3);
             if (nk_button_label(ctx, "Install")) {
-                strcpy(m_statusMessage, "Installing...");
+                if (PerformInstallation()) {
+                    if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Installation successful!", _TRUNCATE) != 0) {
+                        m_statusMessage[0] = '\0';
+                    }
+                    RefreshStatus();
+                } else {
+                    if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Installation failed!", _TRUNCATE) != 0) {
+                        m_statusMessage[0] = '\0';
+                    }
+                }
             }
             
             if (nk_button_label(ctx, "Uninstall")) {
-                strcpy(m_statusMessage, "Uninstalling...");
+                if (PerformUninstallation()) {
+                    if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Uninstallation successful!", _TRUNCATE) != 0) {
+                        m_statusMessage[0] = '\0';
+                    }
+                    RefreshStatus();
+                } else {
+                    if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Uninstallation failed!", _TRUNCATE) != 0) {
+                        m_statusMessage[0] = '\0';
+                    }
+                }
             }
             
             if (nk_button_label(ctx, "Exit")) {
-                PostMessage(GetHWND(), WM_CLOSE, 0, 0);
+                ExitApplication();
             }
         }
         nk_end(ctx);
@@ -161,15 +203,88 @@ public:
     
 private:
     void RefreshStatus() {
-        // TODO: Implement actual status checking
+        // Read current configuration from registry
+        ReadAppConfig(&m_config);
+        
+        // Check installation status
+        m_isInstalled = IsComprehensivelyInstalled();
+        
+        // Check if process is running
+        m_browserRunning = IsProcessRunningWithPID(&m_runningPID);
+        
+        // Update UI state based on configuration
+        m_runAtStartup = m_config.runAtStartup;
+        if (m_config.redirectConfig.customBrowserPath[0] != '\0') {
+            if (strncpy_s(m_redirectUrl, sizeof(m_redirectUrl), m_config.redirectConfig.customBrowserPath, _TRUNCATE) != 0) {
+                m_redirectUrl[0] = '\0';
+            }
+        }
+        
+        // Update status message
         if (m_isInstalled) {
             if (m_browserRunning) {
-                sprintf(m_statusMessage, "Running (PID: %lu)", m_runningPID);
+                if (sprintf_s(m_statusMessage, sizeof(m_statusMessage), "Running (PID: %lu)", m_runningPID) < 0) {
+                    if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Running", _TRUNCATE) != 0) {
+                        m_statusMessage[0] = '\0';
+                    }
+                }
             } else {
-                strcpy(m_statusMessage, "Installed, not running");
+                if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Installed, not running", _TRUNCATE) != 0) {
+                    m_statusMessage[0] = '\0';
+                }
             }
         } else {
-            strcpy(m_statusMessage, "Not installed");
+            if (strncpy_s(m_statusMessage, sizeof(m_statusMessage), "Not installed", _TRUNCATE) != 0) {
+                m_statusMessage[0] = '\0';
+            }
+        }
+    }
+    
+    BOOL PerformInstallation() {
+        DebugLogInfo("Starting Browser Sanity installation process");
+        
+        // Call the full installation function from action_install.c
+        if (InstallApplication()) {
+            DebugLogInfo("Installation completed successfully");
+            
+            // Update UI configuration from the installed config
+            AppConfig config;
+            ReadAppConfig(&config);
+            config.runAtStartup = m_runAtStartup;
+            WriteAppConfig(&config);
+            
+            // Set run at startup if requested
+            if (m_runAtStartup) {
+                DebugLogInfo("Setting application to run at startup");
+                SetRunAtStartup(TRUE);
+            }
+            
+            return TRUE;
+        } else {
+            DebugLogError("Installation failed");
+            return FALSE;
+        }
+    }
+    
+    BOOL PerformUninstallation() {
+        DebugLogInfo("Starting Browser Sanity uninstallation process");
+        
+        // Call the full uninstallation function
+        if (UninstallApplication()) {
+            DebugLogInfo("Uninstallation completed successfully");
+            
+            // Remove from startup
+            SetRunAtStartup(FALSE);
+            
+            // Clear configuration
+            AppConfig config;
+            memset(&config, 0, sizeof(config));
+            WriteAppConfig(&config);
+            
+            return TRUE;
+        } else {
+            DebugLogError("Uninstallation failed");
+            return FALSE;
         }
     }
 };

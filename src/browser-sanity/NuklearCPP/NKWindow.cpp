@@ -3,11 +3,11 @@
  * @brief Implementation of C++ NKWindow base class with shared Nuklear context
  */
 
-#include "../../include/NKWindow.h"
-#include "../../include/NKWindowManager.h"
-#include "../../include/nk_theme.h"
-#include "../../include/main.h"
-#include "../../include/debug_log.h"
+#include <NKWindow.h>
+#include <NKWindowManager.h>
+#include <nk_theme.h>
+#include <main.h>
+#include <debug_log.h>
 #include <windowsx.h>
 #include <map>
 #include <algorithm>
@@ -43,10 +43,14 @@ NKWindow::~NKWindow() {
 }
 
 bool NKWindow::CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const wchar_t* className, int x, int y) {
+    // Convert title from std::string to wide string
+    std::wstring wideTitle;
+    wideTitle.assign(m_title.begin(), m_title.end());
+    
     m_hwnd = CreateWindowExW(
         0,
         className,
-        L"Browser Sanity Window",
+        wideTitle.c_str(),
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         x, y, m_width, m_height,
         NULL, NULL, hInstance, NULL

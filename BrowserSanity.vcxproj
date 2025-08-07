@@ -28,7 +28,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   
   <PropertyGroup>
-    <IncludePath>include;$(IncludePath)</IncludePath>
+    <IncludePath>src/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   
   <ItemDefinitionGroup>
@@ -42,7 +42,7 @@
       <AdditionalDependencies>advapi32.lib;comctl32.lib;ole32.lib;shell32.lib;uuid.lib;wininet.lib;shlwapi.lib;user32.lib;gdi32.lib;comdlg32.lib</AdditionalDependencies>
     </Link>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>include;res</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src/include;res</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
   
@@ -51,14 +51,15 @@
     <!-- C++ main application and window management -->
     <ClCompile Include="src\browser-sanity\main.cpp" />
     <ClCompile Include="src\browser-sanity\nuklear_impl.cpp" />
-    <ClCompile Include="src\browser-sanity\NKWindow.cpp" />
-    <ClCompile Include="src\browser-sanity\NKWindowManager.cpp" />
+    <ClCompile Include="src\browser-sanity\NuklearCPP\NKWindow.cpp" />
+    <ClCompile Include="src\browser-sanity\NuklearCPP\NKWindowManager.cpp" />
     <ClCompile Include="src\browser-sanity\ui\NKWindow_MainLaunch.cpp" />
     <ClCompile Include="src\browser-sanity\ui\NKWindow_Settings.cpp" />
     <ClCompile Include="src\browser-sanity\ui\NKWindow_Toast.cpp" />
     
     <!-- C core functionality -->
     <ClCompile Include="src\browser-sanity\browser_sanity.c" />
+    <ClCompile Include="src\browser-sanity\debug_log.c" />
     <ClCompile Include="src\browser-sanity\actions\action_resources.c" />
     <ClCompile Include="src\browser-sanity\actions\action_install.c" />
     <ClCompile Include="src\browser-sanity\actions\action_uninstall.c" />
@@ -81,7 +82,7 @@
     <MakeDir Directories="build\MsEdgeRedirect\" />
     
     <!-- Compile msedge-redirect.c -->
-    <Exec Command="&quot;$(VCToolsInstallDir)bin\Hostx86\x86\cl.exe&quot; /c /Zi /nologo /W3 /WX- /diagnostics:column /O2 /Oy- /D WIN32 /D _WINDOWS /D _CRT_SECURE_NO_WARNINGS /Gm- /EHsc /MD /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo&quot;build\MsEdgeRedirect\\&quot; /Fd&quot;build\MsEdgeRedirect\vc142.pdb&quot; /external:W3 /Gd /TC /analyze- /FC /errorReport:queue /I include &quot;src\msedge-redirect\msedge-redirect.c&quot;"
+    <Exec Command="&quot;$(VCToolsInstallDir)bin\Hostx86\x86\cl.exe&quot; /c /Zi /nologo /W3 /WX- /diagnostics:column /O2 /Oy- /D WIN32 /D _WINDOWS /D _CRT_SECURE_NO_WARNINGS /Gm- /EHsc /MD /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo&quot;build\MsEdgeRedirect\\&quot; /Fd&quot;build\MsEdgeRedirect\vc142.pdb&quot; /external:W3 /Gd /TC /analyze- /FC /errorReport:queue /I src/include &quot;src\msedge-redirect\msedge-redirect.c&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
     
     <!-- Link msedge.exe -->

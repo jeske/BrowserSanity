@@ -3,7 +3,7 @@
  * @brief Implementation of the msedge.exe replacement
  */
 
-#include "msedge_redirect.h"
+#include <msedge_redirect.h>
 #include <shlwapi.h>
 #include <shlobj.h>
 

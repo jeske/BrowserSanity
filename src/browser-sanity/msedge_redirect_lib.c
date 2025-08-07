@@ -3,7 +3,9 @@
  * @brief Redirect functionality library (without WinMain)
  */
 
-#include "msedge_redirect.h"
+#include <msedge_redirect.h>
+#include <safe_strings.h>
+#include <debug_log.h>
 #include <shlwapi.h>
 #include <shlobj.h>
 
@@ -81,7 +83,10 @@ BOOL GetDefaultBrowserPath(char* browserPath, DWORD bufferSize) {
     RegCloseKey(hKey);
     
     // Get the command for the ProgID
-    sprintf(szCommand, "SOFTWARE\\Classes\\%s\\shell\\open\\command", szProgId);
+    if (sprintf_s(szCommand, MAX_PATH, "SOFTWARE\\Classes\\%s\\shell\\open\\command", szProgId) < 0) {
+        DebugLogError("Failed to format registry command path");
+        return FALSE;
+    }
     if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, szCommand, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
         return FALSE;
     }
@@ -98,17 +103,26 @@ BOOL GetDefaultBrowserPath(char* browserPath, DWORD bufferSize) {
         pExe = strchr(szCommand + 1, '"');
         if (pExe) {
             *pExe = '\0';
-            strncpy(browserPath, szCommand + 1, bufferSize);
+            if (strncpy_s(browserPath, bufferSize, szCommand + 1, _TRUNCATE) != 0) {
+                DebugLogError("Failed to copy browser path from quoted command");
+                return FALSE;
+            }
             return TRUE;
         }
     } else {
         pExe = strchr(szCommand, ' ');
         if (pExe) {
             *pExe = '\0';
-            strncpy(browserPath, szCommand, bufferSize);
+            if (strncpy_s(browserPath, bufferSize, szCommand, _TRUNCATE) != 0) {
+                DebugLogError("Failed to copy browser path from command with space");
+                return FALSE;
+            }
             return TRUE;
         } else {
-            strncpy(browserPath, szCommand, bufferSize);
+            if (strncpy_s(browserPath, bufferSize, szCommand, _TRUNCATE) != 0) {
+                DebugLogError("Failed to copy browser path from command");
+                return FALSE;
+            }
             return TRUE;
         }
     }
@@ -121,7 +135,7 @@ BOOL GetDefaultBrowserPath(char* browserPath, DWORD bufferSize) {
  */
 BOOL LaunchBrowser(const RedirectConfig* config, LPSTR commandLine) {
     char browserPath[MAX_PATH];
-    char fullCommandLine[4096];
+    char fullCommandLine[COMMAND_LINE_SIZE];
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
     
@@ -135,7 +149,10 @@ BOOL LaunchBrowser(const RedirectConfig* config, LPSTR commandLine) {
         // Use the default browser
         if (!GetDefaultBrowserPath(browserPath, sizeof(browserPath))) {
             // Fallback to rundll32 method if we can't get the default browser
-            sprintf(fullCommandLine, "rundll32.exe url.dll,FileProtocolHandler %s", commandLine);
+            if (sprintf_s(fullCommandLine, COMMAND_LINE_SIZE, "rundll32.exe url.dll,FileProtocolHandler %s", commandLine) < 0) {
+                DebugLogError("Failed to format rundll32 command line");
+                return FALSE;
+            }
             
             ZeroMemory(&si, sizeof(si));
             si.cb = sizeof(si);
@@ -157,17 +174,26 @@ BOOL LaunchBrowser(const RedirectConfig* config, LPSTR commandLine) {
                 return FALSE;
             }
         } else {
-            strncpy(browserPath, config->customBrowserPath, sizeof(browserPath));
+            if (strncpy_s(browserPath, sizeof(browserPath), config->customBrowserPath, _TRUNCATE) != 0) {
+                DebugLogError("Failed to copy custom browser path");
+                return FALSE;
+            }
         }
     }
     
     // Build the command line
     if (config->customBrowserArgs[0] != '\0' && !config->useDefaultBrowser) {
         // Use custom arguments
-        sprintf(fullCommandLine, "\"%s\" %s %s", browserPath, config->customBrowserArgs, commandLine);
+        if (sprintf_s(fullCommandLine, COMMAND_LINE_SIZE, "\"%s\" %s %s", browserPath, config->customBrowserArgs, commandLine) < 0) {
+            DebugLogError("Failed to format custom browser command line with args");
+            return FALSE;
+        }
     } else {
         // Use default arguments
-        sprintf(fullCommandLine, "\"%s\" %s", browserPath, commandLine);
+        if (sprintf_s(fullCommandLine, COMMAND_LINE_SIZE, "\"%s\" %s", browserPath, commandLine) < 0) {
+            DebugLogError("Failed to format browser command line");
+            return FALSE;
+        }
     }
     
     // Launch the browser
