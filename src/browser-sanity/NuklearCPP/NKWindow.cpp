@@ -21,7 +21,7 @@ static std::map<HWND, NKWindow*> g_windowMap;
 // NKWindow Implementation
 NKWindow::NKWindow(NKWindowManager& windowManager, const std::string& title, int width, int height)
     : m_windowManager(windowManager), m_title(title), m_width(width), m_height(height)
-    , m_hwnd(nullptr), m_isDrawing(false), m_autoResize(false) {
+    , m_hwnd(nullptr), m_isDrawing(false), m_autoResize(false), m_nuklearFont(nullptr), m_contextInitialized(false) {
     m_bgColor = NK_THEME_OS_WINDOW_BG; // Use theme background color
     
     // Set default size constraints
@@ -29,6 +29,9 @@ NKWindow::NKWindow(NKWindowManager& windowManager, const std::string& title, int
     m_minHeight = 150;
     m_maxWidth = 1200;
     m_maxHeight = 800;
+    
+    // Initialize per-window Nuklear context
+    InitializeNuklearContext();
     
     // Register with window manager
     m_windowManager.RegisterWindow(this);
@@ -42,6 +45,13 @@ NKWindow::~NKWindow() {
     if (m_isDrawing) {
         DestroyWindow();
     }
+    
+    // Cleanup per-window Nuklear context
+    if (m_contextInitialized) {
+        nk_free(&m_nuklearContext);
+        m_contextInitialized = false;
+    }
+    
     // Unregister from window manager
     m_windowManager.UnregisterWindow(this);
 }
@@ -124,7 +134,7 @@ void NKWindow::EndFrame() {
 }
 
 struct nk_context* NKWindow::GetContext() const {
-    return m_windowManager.GetContext();
+    return const_cast<struct nk_context*>(&m_nuklearContext);
 }
 
 void NKWindow::HandleResize(int width, int height) {
@@ -139,9 +149,9 @@ void NKWindow::HandleResize(int width, int height) {
 }
 
 int NKWindow::HandleInput(HWND hwndEventSource, UINT msg, WPARAM wparam, LPARAM lparam) {
-    if (m_isDrawing) {
-        // Forward input to window manager for processing
-        m_windowManager.ProcessInput(hwndEventSource, msg, wparam, lparam);
+    if (m_isDrawing && m_contextInitialized) {
+        // Process input directly with this window's own context
+        ProcessInputEventForWindow(hwndEventSource, msg, wparam, lparam);
         
         NKGdiBackend* backend = m_windowManager.GetGdiBackend(hwndEventSource);
         if (backend) {
@@ -201,6 +211,192 @@ void NKWindow::SetSizeConstraints(int minW, int minH, int maxW, int maxH) {
     m_minHeight = minH;
     m_maxWidth = maxW;
     m_maxHeight = maxH;
+}
+
+void NKWindow::InitializeNuklearContext() {
+    // Initialize font atlas (copied from NKWindowManager)
+    struct nk_font_atlas atlas;
+    nk_font_atlas_init_default(&atlas);
+    nk_font_atlas_begin(&atlas);
+    
+    // Add default font with 16pt size for DPI scaling
+    m_nuklearFont = nk_font_atlas_add_default(&atlas, 16, 0);
+    
+    // Bake the font atlas
+    const void *image;
+    int atlas_w, atlas_h;
+    image = nk_font_atlas_bake(&atlas, &atlas_w, &atlas_h, NK_FONT_ATLAS_RGBA32);
+    
+    // End atlas (no GPU upload needed for GDI)
+    nk_font_atlas_end(&atlas, nk_handle_ptr(0), NULL);
+    
+    // Initialize context with font
+    nk_init_default(&m_nuklearContext, &m_nuklearFont->handle);
+    
+    // Apply theme (copied from NKWindowManager)
+    ApplyThemeToContext();
+    
+    m_contextInitialized = true;
+    DebugLog("InitializeNuklearContext: Per-window context initialized for window: %s", m_title.c_str());
+}
+
+void NKWindow::ApplyThemeToContext() {
+    // Apply light theme colors (copied from NKWindowManager)
+    struct nk_color table[NK_COLOR_COUNT];
+    table[NK_COLOR_TEXT] = NK_THEME_TEXT;
+    table[NK_COLOR_WINDOW] = NK_THEME_WINDOW;
+    table[NK_COLOR_HEADER] = NK_THEME_HEADER;
+    table[NK_COLOR_BORDER] = NK_THEME_BORDER;
+    table[NK_COLOR_BUTTON] = nk_rgb(220, 220, 220);
+    table[NK_COLOR_BUTTON_HOVER] = nk_rgb(200, 200, 200);
+    table[NK_COLOR_BUTTON_ACTIVE] = NK_THEME_BUTTON_ACTIVE;
+    table[NK_COLOR_TOGGLE] = NK_THEME_TOGGLE;
+    table[NK_COLOR_TOGGLE_HOVER] = NK_THEME_TOGGLE_HOVER;
+    table[NK_COLOR_TOGGLE_CURSOR] = NK_THEME_TOGGLE_CURSOR;
+    table[NK_COLOR_SELECT] = NK_THEME_SELECT;
+    table[NK_COLOR_SELECT_ACTIVE] = NK_THEME_SELECT_ACTIVE;
+    table[NK_COLOR_SLIDER] = NK_THEME_SLIDER;
+    table[NK_COLOR_SLIDER_CURSOR] = NK_THEME_SLIDER_CURSOR;
+    table[NK_COLOR_SLIDER_CURSOR_HOVER] = NK_THEME_SLIDER_CURSOR_HOVER;
+    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = NK_THEME_SLIDER_CURSOR_ACTIVE;
+    table[NK_COLOR_PROPERTY] = NK_THEME_PROPERTY;
+    table[NK_COLOR_EDIT] = NK_THEME_EDIT;
+    table[NK_COLOR_EDIT_CURSOR] = NK_THEME_EDIT_CURSOR;
+    table[NK_COLOR_COMBO] = NK_THEME_COMBO;
+    table[NK_COLOR_CHART] = NK_THEME_CHART;
+    table[NK_COLOR_CHART_COLOR] = NK_THEME_CHART_COLOR;
+    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = NK_THEME_CHART_COLOR_HIGHLIGHT;
+    table[NK_COLOR_SCROLLBAR] = NK_THEME_SCROLLBAR;
+    table[NK_COLOR_SCROLLBAR_CURSOR] = NK_THEME_SCROLLBAR_CURSOR;
+    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = NK_THEME_SCROLLBAR_CURSOR_HOVER;
+    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = NK_THEME_SCROLLBAR_CURSOR_ACTIVE;
+    table[NK_COLOR_TAB_HEADER] = NK_THEME_TAB_HEADER;
+    
+    // Apply the color table to the context
+    nk_style_from_table(&m_nuklearContext, table);
+    
+    // Additional style tweaks for better appearance
+    m_nuklearContext.style.window.border = 2.0f;
+    m_nuklearContext.style.window.rounding = 6.0f;
+    m_nuklearContext.style.window.border_color = nk_rgb(160, 160, 160);
+    m_nuklearContext.style.button.border = 2.0f;
+    m_nuklearContext.style.button.rounding = 4.0f;
+    m_nuklearContext.style.button.border_color = nk_rgb(160, 160, 160);
+    m_nuklearContext.style.edit.border = 1.0f;
+    m_nuklearContext.style.edit.rounding = 4.0f;
+    m_nuklearContext.style.edit.border_color = NK_THEME_BORDER;
+}
+
+void NKWindow::ProcessInputEventForWindow(HWND hwndEventReceiver, UINT msg, WPARAM wparam, LPARAM lparam) {
+    if (!m_contextInitialized) return;
+    
+    // Process input event directly with this window's own context
+    // This ensures complete input isolation between windows
+    switch (msg) {
+        case WM_KEYDOWN:
+        case WM_KEYUP: {
+            int down = (msg == WM_KEYDOWN);
+            int ctrl = GetKeyState(VK_CONTROL) & 0x8000;
+            
+            switch (wparam) {
+                case VK_SHIFT:
+                case VK_LSHIFT:
+                case VK_RSHIFT:
+                    nk_input_key(&m_nuklearContext, NK_KEY_SHIFT, down);
+                    break;
+                case VK_DELETE:
+                    nk_input_key(&m_nuklearContext, NK_KEY_DEL, down);
+                    break;
+                case VK_RETURN:
+                    nk_input_key(&m_nuklearContext, NK_KEY_ENTER, down);
+                    break;
+                case VK_TAB:
+                    nk_input_key(&m_nuklearContext, NK_KEY_TAB, down);
+                    break;
+                case VK_LEFT:
+                    if (ctrl) nk_input_key(&m_nuklearContext, NK_KEY_TEXT_WORD_LEFT, down);
+                    else nk_input_key(&m_nuklearContext, NK_KEY_LEFT, down);
+                    break;
+                case VK_RIGHT:
+                    if (ctrl) nk_input_key(&m_nuklearContext, NK_KEY_TEXT_WORD_RIGHT, down);
+                    else nk_input_key(&m_nuklearContext, NK_KEY_RIGHT, down);
+                    break;
+                case VK_BACK:
+                    nk_input_key(&m_nuklearContext, NK_KEY_BACKSPACE, down);
+                    break;
+                case VK_HOME:
+                    nk_input_key(&m_nuklearContext, NK_KEY_TEXT_START, down);
+                    break;
+                case VK_END:
+                    nk_input_key(&m_nuklearContext, NK_KEY_TEXT_END, down);
+                    break;
+                case 'A':
+                    if (ctrl && down) {
+                        nk_input_key(&m_nuklearContext, NK_KEY_TEXT_SELECT_ALL, 1);
+                    }
+                    break;
+                case 'C':
+                    if (ctrl && down) {
+                        nk_input_key(&m_nuklearContext, NK_KEY_COPY, 1);
+                    }
+                    break;
+                case 'V':
+                    if (ctrl && down) {
+                        nk_input_key(&m_nuklearContext, NK_KEY_PASTE, 1);
+                    }
+                    break;
+                case 'X':
+                    if (ctrl && down) {
+                        nk_input_key(&m_nuklearContext, NK_KEY_CUT, 1);
+                    }
+                    break;
+            }
+            break;
+        }
+        case WM_CHAR:
+            if (wparam >= 32) {
+                nk_input_unicode(&m_nuklearContext, (nk_rune)wparam);
+            }
+            break;
+        case WM_LBUTTONDOWN: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            // Left mouse button down - input isolated to this window
+            SetCapture(hwndEventReceiver);
+            nk_input_button(&m_nuklearContext, NK_BUTTON_LEFT, x, y, 1);
+            break;
+        }
+        case WM_LBUTTONUP: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            // Left mouse button up - input isolated to this window
+            ReleaseCapture();
+            nk_input_button(&m_nuklearContext, NK_BUTTON_LEFT, x, y, 0);
+            break;
+        }
+        case WM_RBUTTONDOWN: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            // Right mouse button down - input isolated to this window
+            SetCapture(hwndEventReceiver);
+            nk_input_button(&m_nuklearContext, NK_BUTTON_RIGHT, x, y, 1);
+            break;
+        }
+        case WM_RBUTTONUP: {
+            int x = GET_X_LPARAM(lparam);
+            int y = GET_Y_LPARAM(lparam);
+            // Right mouse button up - input isolated to this window
+            ReleaseCapture();
+            nk_input_button(&m_nuklearContext, NK_BUTTON_RIGHT, x, y, 0);
+            break;
+        }
+        case WM_MOUSEMOVE:
+            nk_input_motion(&m_nuklearContext, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam));
+            break;
+        case WM_MOUSEWHEEL:
+            nk_input_scroll(&m_nuklearContext, nk_vec2(0, (float)(short)HIWORD(wparam) / WHEEL_DELTA));
+            break;
+    }
 }
 
 // Window mapping functions

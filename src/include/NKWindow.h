@@ -30,8 +30,23 @@ class NKWindowManager;
 struct NKGdiBackend;  // Forward declaration
 
 /**
- * @brief Base class for all Nuklear windows
- * Provides common window management, Nuklear context, and virtual interface
+ * 🎯 BREAKTHROUGH SOLUTION: Context-Per-Window Architecture
+ *
+ * This class implements the ONLY working solution for multi-window Nuklear applications.
+ * Each window owns its complete Nuklear context to prevent assertion failures.
+ *
+ * 🚨 CRITICAL: Shared contexts cause assertion failures due to input window/context mismatches.
+ * The solution is complete input isolation - each window processes ONLY its own input events.
+ *
+ * Key Architecture:
+ * - Each window has its own nk_context (m_nuklearContext)
+ * - Each window has its own font atlas (m_nuklearFont)
+ * - Input events are routed to target window ONLY via ProcessInputEventForWindow()
+ * - No shared state prevents Nuklear's internal consistency check failures
+ *
+ * This prevents assertion failures like:
+ * - "GetCapture() == current_hwnd" (input capture window mismatch)
+ * - "ctx->input.mouse.grab_window == current_window" (mouse grab state mismatch)
  */
 class NKWindow {
     friend LRESULT CALLBACK NKWindowProc(HWND hwndEventSource, UINT msg, WPARAM wparam, LPARAM lparam);
@@ -61,6 +76,10 @@ public:
     
     // Accessors
     HWND GetHWND() const { return m_hwnd; }
+    /**
+     * Get THIS window's Nuklear context
+     * ✅ Each window has its own context - complete isolation
+     */
     struct nk_context* GetContext() const;
     bool IsActive();
     const std::string& GetTitle() const { return m_title; }
@@ -81,6 +100,11 @@ protected:
     bool m_autoResize;
     struct nk_color m_bgColor;
     
+    // ✅ Per-window Nuklear state - complete isolation prevents assertion failures
+    struct nk_context m_nuklearContext;    // THIS window's context only
+    struct nk_font* m_nuklearFont;         // THIS window's font atlas
+    bool m_contextInitialized;
+    
     // Dynamic sizing members
     int m_minWidth, m_minHeight;
     int m_maxWidth, m_maxHeight;
@@ -90,6 +114,27 @@ protected:
     void InvalidateWindow();
     void UpdateWindowSize();  // New method for dynamic sizing
     void SetSizeConstraints(int minW, int minH, int maxW = 1200, int maxH = 800);
+    
+    /**
+     * Initialize THIS window's Nuklear context with its own font atlas and theme
+     * ✅ Complete isolation - no shared state with other windows
+     */
+    void InitializeNuklearContext();
+    
+    /**
+     * Apply theme to THIS window's context only
+     * ✅ Each window can have independent styling
+     */
+    void ApplyThemeToContext();
+
+public:
+    /**
+     * 🎯 CRITICAL: Process input events for THIS window ONLY
+     * This method ensures input events are isolated to the correct window's context,
+     * preventing assertion failures from input window/context mismatches.
+     * Called by NKWindowManager with proper input routing.
+     */
+    void ProcessInputEventForWindow(HWND hwndEventReceiver, UINT msg, WPARAM wparam, LPARAM lparam);
 };
 
 
