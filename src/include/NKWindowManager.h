@@ -116,6 +116,10 @@ public:
     void SetFocusedWindow(HWND hwnd) { m_focusedWindow = hwnd; }
     HWND GetFocusedWindow() const { return m_focusedWindow; }
     
+    // Active window management
+    void SetActiveWindow(NKWindow* window) { m_activeWindow = window; }
+    NKWindow* GetActiveWindow() const { return m_activeWindow; }
+    
     // Draw command processing
     void ProcessDrawCommand(std::set<HWND>& windowsNeedingPaint, const struct nk_command* cmd);
     void ProcessDrawCommandForWindow(NKGdiBackend* backend, const struct nk_command* cmd);
@@ -137,6 +141,9 @@ private:
     // Smart input routing components
     std::queue<InputEvent> m_inputEvents;
     HWND m_focusedWindow;
+    
+    // Active window tracking
+    NKWindow* m_activeWindow;
     
     void InitializeNuklearContext();
     void ApplyTheme();

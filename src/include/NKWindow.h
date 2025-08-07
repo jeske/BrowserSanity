@@ -62,7 +62,7 @@ public:
     // Accessors
     HWND GetHWND() const { return m_hwnd; }
     struct nk_context* GetContext() const;
-    bool IsActive() const { return m_active; }
+    bool IsActive();
     const std::string& GetTitle() const { return m_title; }
     int GetWidth() const { return m_width; }
     int GetHeight() const { return m_height; }
@@ -77,7 +77,7 @@ protected:
     std::string m_title;
     int m_width, m_height;
     HWND m_hwnd;
-    bool m_active;
+    bool m_isDrawing;
     bool m_autoResize;
     struct nk_color m_bgColor;
     

@@ -21,7 +21,7 @@ static std::map<HWND, NKWindow*> g_windowMap;
 // NKWindow Implementation
 NKWindow::NKWindow(NKWindowManager& windowManager, const std::string& title, int width, int height)
     : m_windowManager(windowManager), m_title(title), m_width(width), m_height(height)
-    , m_hwnd(nullptr), m_active(false), m_autoResize(false) {
+    , m_hwnd(nullptr), m_isDrawing(false), m_autoResize(false) {
     m_bgColor = NK_THEME_OS_WINDOW_BG; // Use theme background color
     
     // Set default size constraints
@@ -34,8 +34,12 @@ NKWindow::NKWindow(NKWindowManager& windowManager, const std::string& title, int
     m_windowManager.RegisterWindow(this);
 }
 
+bool NKWindow::IsActive() {
+    return (m_windowManager.GetActiveWindow() == this);
+}
+
 NKWindow::~NKWindow() {
-    if (m_active) {
+    if (m_isDrawing) {
         DestroyWindow();
     }
     // Unregister from window manager
@@ -71,7 +75,7 @@ bool NKWindow::CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const char* 
         backend->Initialize(m_hwnd, m_width, m_height);
         m_windowManager.RegisterGdiBackend(m_hwnd, backend);
         
-        m_active = true;
+        m_isDrawing = true;
         OnCreate();
         return true;
     } else {
@@ -104,7 +108,7 @@ void NKWindow::DestroyWindow() {
         
         ::DestroyWindow(m_hwnd);
         m_hwnd = nullptr;
-        m_active = false;
+        m_isDrawing = false;
     }
 }
 
@@ -114,7 +118,7 @@ void NKWindow::BeginFrame() {
 
 void NKWindow::EndFrame() {
     // No longer needed - window manager handles the drawing cycle
-    if (m_active) {
+    if (m_isDrawing) {
         InvalidateWindow();
     }
 }
@@ -126,7 +130,7 @@ struct nk_context* NKWindow::GetContext() const {
 void NKWindow::HandleResize(int width, int height) {
     m_width = width;
     m_height = height;
-    if (m_active) {
+    if (m_isDrawing) {
         NKGdiBackend* backend = m_windowManager.GetGdiBackend(m_hwnd);
         if (backend) {
             backend->Resize(width, height);
@@ -135,7 +139,7 @@ void NKWindow::HandleResize(int width, int height) {
 }
 
 int NKWindow::HandleInput(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-    if (m_active) {
+    if (m_isDrawing) {
         // Forward input to window manager for processing
         m_windowManager.ProcessInput(hwnd, msg, wparam, lparam);
         
@@ -249,7 +253,7 @@ LRESULT CALLBACK NKWindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
             DebugLog("WM_PAINT: Starting paint for HWND %p", hwnd);
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
-            if (window && window->IsActive()) {
+            if (window) {
                 // Get GDI backend from window manager and copy from memory DC to window DC
                 NKGdiBackend* backend = window->m_windowManager.GetGdiBackend(hwnd);
                 if (backend && backend->memory_dc) {

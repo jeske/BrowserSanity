@@ -12,7 +12,7 @@
 #include <set>
 
 NKWindowManager::NKWindowManager()
-    : m_font(nullptr), m_initialized(false), m_focusedWindow(nullptr) {
+    : m_font(nullptr), m_initialized(false), m_focusedWindow(nullptr), m_activeWindow(nullptr) {
     memset(&m_ctx, 0, sizeof(m_ctx));
 }
 
@@ -136,7 +136,7 @@ void NKWindowManager::UpdateAll() {
     std::set<HWND> windowsNeedingPaint;
     
     for (NKWindow* window : m_windows) {
-        if (window && window->IsActive()) {
+        if (window) {
             activeWindows++;
             HWND hwnd = window->GetHWND();
             
@@ -146,22 +146,24 @@ void NKWindowManager::UpdateAll() {
             DebugLog("UpdateAll: Processing window HWND %p", (void*)hwnd);
             
             // Process input events targeted for this specific window
-            std::queue<InputEvent> remainingEvents;
-            while (!m_inputEvents.empty()) {
-                InputEvent event = m_inputEvents.front();
-                m_inputEvents.pop();
-                
-                if (ShouldReceiveInput(event.target_hwnd, hwnd, event.msg)) {
-                    // This event is for the current window - process it
-                    ProcessInputEventForWindow(hwnd, event);
-                    DebugLog("UpdateAll: Processed input event for window %p", (void*)hwnd);
-                } else {
-                    // This event is for a different window - keep it for later
-                    remainingEvents.push(event);
+            if (window->IsActive()) {
+                std::queue<InputEvent> remainingEvents;
+                while (!m_inputEvents.empty()) {
+                    InputEvent event = m_inputEvents.front();
+                    m_inputEvents.pop();
+                    
+                    if (ShouldReceiveInput(event.target_hwnd, hwnd, event.msg)) {
+                        // This event is for the current window - process it
+                        ProcessInputEventForWindow(hwnd, event);
+                        DebugLog("UpdateAll: Processed input event for window %p", (void*)hwnd);
+                    } else {
+                        // This event is for a different window - keep it for later
+                        remainingEvents.push(event);
+                    }
                 }
+                // Restore remaining events for other windows
+                m_inputEvents = remainingEvents;
             }
-            // Restore remaining events for other windows
-            m_inputEvents = remainingEvents;
             
             // Let window build its UI using existing Render() method
             window->Render();
