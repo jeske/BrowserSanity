@@ -389,6 +389,15 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         // Start Nana event loop
         nana::exec();
         
+        // Check if we should exit or stay running in watchdog mode
+        if (!g_nanaApp.config.watchdogEnabled) {
+            // Not in watchdog mode, so exit the application
+            g_nanaApp.running = false;
+            DebugLog("All windows closed, exiting application (not in watchdog mode)");
+        } else {
+            DebugLog("All windows closed, but staying running in watchdog mode");
+        }
+        
         // Clean up
         g_nanaApp.RemoveTrayIcon();
         

@@ -1,5 +1,5 @@
 /**
- * @file action_resources.c
+ * @file action_resources.cpp
  * @brief Resource extraction utilities for Browser Sanity actions
  */
 

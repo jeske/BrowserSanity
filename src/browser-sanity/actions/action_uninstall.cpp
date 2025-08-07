@@ -1,5 +1,5 @@
 /**
- * @file action_uninstall.c
+ * @file action_uninstall.cpp
  * @brief Uninstallation action implementation
  */
 
@@ -20,9 +20,12 @@
  * @return TRUE if successful, FALSE otherwise
  */
 BOOL UninstallApplication() {
-    char desktopPath[MAX_PATH];
-    char startMenuPath[MAX_PATH];
-    char shortcutPath[MAX_PATH];
+    WCHAR desktopPath[MAX_PATH];
+    WCHAR startMenuPath[MAX_PATH];
+    WCHAR shortcutPath[MAX_PATH];
+    char desktopPathA[MAX_PATH];
+    char startMenuPathA[MAX_PATH];
+    char shortcutPathA[MAX_PATH];
     AppConfig config;
     
     DebugLogInfo("=== Starting Browser Sanity Uninstallation ===");
@@ -51,13 +54,15 @@ BOOL UninstallApplication() {
     
     // Get the desktop path
     SHGetFolderPath(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, desktopPath);
-    DebugLogInfo("Desktop path: %s", desktopPath);
+    WideCharToMultiByte(CP_ACP, 0, desktopPath, -1, desktopPathA, MAX_PATH, NULL, NULL);
+    DebugLogInfo("Desktop path: %s", desktopPathA);
     
     // Remove the desktop shortcut
-    if (sprintf_s(shortcutPath, MAX_PATH, "%s\\Browser Sanity.lnk", desktopPath) != 0) {
+    if (sprintf_s(shortcutPathA, MAX_PATH, "%s\\Browser Sanity.lnk", desktopPathA) != 0) {
         DebugLogError("Failed to format desktop shortcut path");
     } else {
-        DebugLogInfo("Removing desktop shortcut: %s", shortcutPath);
+        MultiByteToWideChar(CP_ACP, 0, shortcutPathA, -1, shortcutPath, MAX_PATH);
+        DebugLogInfo("Removing desktop shortcut: %s", shortcutPathA);
         if (DeleteFile(shortcutPath)) {
             DebugLogInfo("Desktop shortcut removed successfully");
         } else {
@@ -67,13 +72,15 @@ BOOL UninstallApplication() {
     
     // Get the start menu path
     SHGetFolderPath(NULL, CSIDL_PROGRAMS, NULL, 0, startMenuPath);
-    DebugLogInfo("Start menu path: %s", startMenuPath);
+    WideCharToMultiByte(CP_ACP, 0, startMenuPath, -1, startMenuPathA, MAX_PATH, NULL, NULL);
+    DebugLogInfo("Start menu path: %s", startMenuPathA);
     
     // Remove the start menu shortcut
-    if (sprintf_s(shortcutPath, MAX_PATH, "%s\\Browser Sanity\\Browser Sanity.lnk", startMenuPath) != 0) {
+    if (sprintf_s(shortcutPathA, MAX_PATH, "%s\\Browser Sanity\\Browser Sanity.lnk", startMenuPathA) != 0) {
         DebugLogError("Failed to format start menu shortcut path");
     } else {
-        DebugLogInfo("Removing start menu shortcut: %s", shortcutPath);
+        MultiByteToWideChar(CP_ACP, 0, shortcutPathA, -1, shortcutPath, MAX_PATH);
+        DebugLogInfo("Removing start menu shortcut: %s", shortcutPathA);
         if (DeleteFile(shortcutPath)) {
             DebugLogInfo("Start menu shortcut removed successfully");
         } else {
@@ -82,10 +89,11 @@ BOOL UninstallApplication() {
     }
     
     // Remove the start menu directory
-    if (sprintf_s(shortcutPath, MAX_PATH, "%s\\Browser Sanity", startMenuPath) != 0) {
+    if (sprintf_s(shortcutPathA, MAX_PATH, "%s\\Browser Sanity", startMenuPathA) != 0) {
         DebugLogError("Failed to format start menu directory path");
     } else {
-        DebugLogInfo("Removing start menu directory: %s", shortcutPath);
+        MultiByteToWideChar(CP_ACP, 0, shortcutPathA, -1, shortcutPath, MAX_PATH);
+        DebugLogInfo("Removing start menu directory: %s", shortcutPathA);
         if (RemoveDirectory(shortcutPath)) {
             DebugLogInfo("Start menu directory removed successfully");
         } else {
@@ -94,32 +102,40 @@ BOOL UninstallApplication() {
     }
     
     // Delete the registry key
+    WCHAR regKeyW[256];
+    MultiByteToWideChar(CP_ACP, 0, BROWSER_SANITY_REG_KEY, -1, regKeyW, 256);
     DebugLogInfo("Removing registry key: %s", BROWSER_SANITY_REG_KEY);
-    if (RegDeleteKey(HKEY_LOCAL_MACHINE, BROWSER_SANITY_REG_KEY) == ERROR_SUCCESS) {
+    if (RegDeleteKey(HKEY_LOCAL_MACHINE, regKeyW) == ERROR_SUCCESS) {
         DebugLogInfo("Registry key removed successfully");
     } else {
         DebugLogInfo("Registry key not found or already removed");
     }
     
     // Copy the executable to the temp directory for self-deletion
-    char tempPath[MAX_PATH];
-    char tempExe[MAX_PATH];
-    char installPath[MAX_PATH];
+    WCHAR tempPath[MAX_PATH];
+    WCHAR tempExe[MAX_PATH];
+    WCHAR installPath[MAX_PATH];
+    char tempPathA[MAX_PATH];
+    char tempExeA[MAX_PATH];
+    char installPathA[MAX_PATH];
     char command[COMMAND_LINE_SIZE];
     
     GetTempPath(MAX_PATH, tempPath);
-    if (sprintf_s(tempExe, MAX_PATH, "%s\\BrowserSanity_uninstall.exe", tempPath) != 0) {
+    WideCharToMultiByte(CP_ACP, 0, tempPath, -1, tempPathA, MAX_PATH, NULL, NULL);
+    if (sprintf_s(tempExeA, MAX_PATH, "%s\\BrowserSanity_uninstall.exe", tempPathA) != 0) {
         DebugLogError("Failed to format temp executable path");
         return FALSE;
     }
-    if (sprintf_s(installPath, MAX_PATH, "%s\\BrowserSanity.exe", config.installPath) != 0) {
+    if (sprintf_s(installPathA, MAX_PATH, "%s\\BrowserSanity.exe", config.installPath) != 0) {
         DebugLogError("Failed to format install path");
         return FALSE;
     }
+    MultiByteToWideChar(CP_ACP, 0, tempExeA, -1, tempExe, MAX_PATH);
+    MultiByteToWideChar(CP_ACP, 0, installPathA, -1, installPath, MAX_PATH);
     
     DebugLogInfo("Setting up self-deletion process");
-    DebugLogInfo("Temp path: %s", tempPath);
-    DebugLogInfo("Install path: %s", installPath);
+    DebugLogInfo("Temp path: %s", tempPathA);
+    DebugLogInfo("Install path: %s", installPathA);
     
     // Copy the executable to the temp directory
     DebugLogInfo("Copying executable to temp directory for self-deletion");
@@ -133,7 +149,7 @@ BOOL UninstallApplication() {
     char batchPath[MAX_PATH];
     FILE* batch;
     
-    if (sprintf_s(batchPath, MAX_PATH, "%s\\BrowserSanity_uninstall.bat", tempPath) != 0) {
+    if (sprintf_s(batchPath, MAX_PATH, "%s\\BrowserSanity_uninstall.bat", tempPathA) != 0) {
         DebugLogError("Failed to format batch file path");
         return FALSE;
     }
@@ -143,9 +159,9 @@ BOOL UninstallApplication() {
     if (batch) {
         fprintf(batch, "@echo off\n");
         fprintf(batch, "timeout /t 1 /nobreak > nul\n");
-        fprintf(batch, "del \"%s\"\n", installPath);
+        fprintf(batch, "del \"%s\"\n", installPathA);
         fprintf(batch, "rmdir \"%s\"\n", config.installPath);
-        fprintf(batch, "del \"%s\"\n", tempExe);
+        fprintf(batch, "del \"%s\"\n", tempExeA);
         fprintf(batch, "del \"%s\"\n", batchPath);
         fclose(batch);
         
@@ -175,7 +191,7 @@ int RunUninstallerAction() {
     
     // Check if we need to elevate
     if (!IsUserAnAdmin()) {
-        char exePath[MAX_PATH];
+        WCHAR exePath[MAX_PATH];
         
         DebugLogInfo("Elevation required - requesting administrator privileges");
         
@@ -189,14 +205,14 @@ int RunUninstallerAction() {
         SHELLEXECUTEINFO sei;
         ZeroMemory(&sei, sizeof(SHELLEXECUTEINFO));
         sei.cbSize = sizeof(SHELLEXECUTEINFO);
-        sei.lpVerb = "runas";
+        sei.lpVerb = L"runas";
         sei.lpFile = exePath;
-        sei.lpParameters = "/uninstall";
+        sei.lpParameters = L"/uninstall";
         sei.nShow = SW_NORMAL;
         
         if (!ShellExecuteEx(&sei)) {
             DebugLogError("Failed to elevate privileges");
-            MessageBox(NULL, "Failed to elevate privileges.", "Browser Sanity", MB_OK | MB_ICONERROR);
+            MessageBox(NULL, L"Failed to elevate privileges.", L"Browser Sanity", MB_OK | MB_ICONERROR);
             return 1;
         }
         
@@ -209,13 +225,13 @@ int RunUninstallerAction() {
     // Uninstall the application
     if (!UninstallApplication()) {
         DebugLogError("Uninstallation failed");
-        MessageBox(NULL, "Failed to uninstall Browser Sanity.", "Browser Sanity", MB_OK | MB_ICONERROR);
+        MessageBox(NULL, L"Failed to uninstall Browser Sanity.", L"Browser Sanity", MB_OK | MB_ICONERROR);
         return 1;
     }
     
     // Show success message
     DebugLogInfo("Uninstallation completed successfully");
-    MessageBox(NULL, "Browser Sanity has been uninstalled successfully.", "Browser Sanity", MB_OK | MB_ICONINFORMATION);
+    MessageBox(NULL, L"Browser Sanity has been uninstalled successfully.", L"Browser Sanity", MB_OK | MB_ICONINFORMATION);
     
     return 0;
 }

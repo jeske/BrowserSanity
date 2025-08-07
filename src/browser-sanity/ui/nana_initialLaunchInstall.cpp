@@ -21,16 +21,18 @@
 #include <windows.h>
 
 // Include C functionality
-extern "C" {
-    #include <browser_sanity.h>
-    #include <debug_log.h>
-    #include <resource.h>
-}
+#include <browser_sanity.h>
+#include <debug_log.h>
+#include <resource.h>
+
+// Include the installer action function
+int RunInstallerAction();
 
 // Forward declaration for progress window access
 extern void ShowProgressWindow(bool isInstall);
 extern void UpdateProgressWindow(int percentage, const char* status);
 extern void CompleteProgressWindow(bool success);
+extern void ExitApplication();
 
 class NanaInstallerWindow {
 private:
@@ -76,6 +78,7 @@ public:
         SetupLayout();
         SetupEventHandlers();
         CheckForUpdates();
+        CheckInstallationStatus();
     }
     
     void Show() {
@@ -108,6 +111,8 @@ private:
         descriptionLabel.caption("End the tyranny of applications that ignore your default browser settings!");
         descriptionLabel.text_align(nana::align::center);
         descriptionLabel.typeface(nana::paint::font("", 11, true)); // Bold
+        
+        // Status will be updated in CheckInstallationStatus()
         
         purposeLabel.caption(
             "Browser Sanity replaces msedge.exe to redirect Edge launches to your preferred browser.\n\n"
@@ -173,13 +178,49 @@ private:
         });
         
         installButton.events().click([this]() {
-            // Show progress window and start installation
+            // Check if we need to elevate privileges first
+            if (!IsUserAnAdmin()) {
+                DebugLogInfo("Elevation required - requesting administrator privileges");
+                
+                WCHAR exePath[MAX_PATH];
+                if (GetModuleFileNameW(NULL, exePath, MAX_PATH) == 0) {
+                    nana::msgbox msg(installerForm, "Installation Error");
+                    msg.icon(nana::msgbox::icon_error);
+                    msg << "Failed to get executable path for elevation";
+                    msg.show();
+                    return;
+                }
+                
+                // Elevate and run with the same parameters
+                SHELLEXECUTEINFOW sei;
+                ZeroMemory(&sei, sizeof(SHELLEXECUTEINFOW));
+                sei.cbSize = sizeof(SHELLEXECUTEINFOW);
+                sei.lpVerb = L"runas";
+                sei.lpFile = exePath;
+                sei.lpParameters = L"/install";
+                sei.nShow = SW_NORMAL;
+                
+                if (!ShellExecuteExW(&sei)) {
+                    nana::msgbox msg(installerForm, "Installation Error");
+                    msg.icon(nana::msgbox::icon_error);
+                    msg << "Failed to elevate privileges. Please run as administrator.";
+                    msg.show();
+                    return;
+                }
+                
+                // The elevated process will handle the installation
+                // We can close this instance
+                ExitApplication();
+                return;
+            }
+            
+            // We have admin privileges, proceed with installation
             ShowProgressWindow(true); // true = installation
             PerformInstallationWithProgress();
         });
         
         exitButton.events().click([this]() {
-            nana::API::exit_all();
+            ExitApplication();
         });
         
         installerForm.events().unload([this](const nana::arg_unload& arg) {
@@ -194,27 +235,67 @@ private:
         updateButton.enabled(updateAvailable);
     }
     
+    void CheckInstallationStatus() {
+        // Check if the application is installed in Program Files
+        bool isInstalled = IsComprehensivelyInstalled();
+        
+        // Check if the application is currently running
+        DWORD runningPID = 0;
+        bool isRunning = IsProcessRunningWithPID(&runningPID);
+        
+        // Update the purpose label with the status
+        std::string statusText = "Current Status:\n";
+        statusText += isInstalled ? "• Installed in Program Files: Yes\n" : "• Installed in Program Files: No\n";
+        statusText += isRunning ? "• Currently Running: Yes (PID: " + std::to_string(runningPID) + ")\n\n" : "• Currently Running: No\n\n";
+        
+        statusText += "Browser Sanity replaces msedge.exe to redirect Edge launches to your preferred browser.\n\n"
+                     "Features:\n"
+                     "• Redirects Edge to your default browser\n"
+                     "• Runs silently in the background\n"
+                     "• Monitors and repairs redirect if tampered with\n"
+                     "• Easy install/uninstall process";
+        
+        purposeLabel.caption(statusText);
+        
+        // Update the install button text based on status
+        if (isInstalled) {
+            installButton.caption("Reinstall Browser Sanity");
+        } else {
+            installButton.caption("Install Browser Sanity");
+        }
+    }
+    
     void PerformInstallationWithProgress() {
         // Perform installation process with progress updates (single-threaded)
         try {
+            // Hook into the actual installation process
+            
+            // Step 1: Prepare installation
             UpdateProgressWindow(10, "Preparing installation...");
-            Sleep(500); // Use Windows Sleep instead of std::this_thread
             
+            // Step 2: Check system requirements
             UpdateProgressWindow(25, "Checking system requirements...");
-            Sleep(500);
             
+            // We already checked for admin privileges before showing the progress window
+            
+            // Step 3: Create program directories
             UpdateProgressWindow(40, "Creating program directories...");
-            Sleep(500);
             
+            // Step 4: Install application files
             UpdateProgressWindow(60, "Installing application files...");
-            bool installResult = InstallApplication();
+            DebugLogInfo("Calling RunInstallerAction() from nana_initialLaunchInstall.cpp");
+            int installResult = RunInstallerAction();
+            DebugLogInfo("RunInstallerAction() returned: %d", installResult);
             
-            if (installResult) {
+            // Convert the result to a boolean (0 = success)
+            bool success = (installResult == 0);
+            
+            if (success) {
+                // Step 5: Configure startup settings
                 UpdateProgressWindow(80, "Configuring startup settings...");
-                Sleep(500);
                 
+                // Step 6: Finalize installation
                 UpdateProgressWindow(95, "Finalizing installation...");
-                Sleep(500);
                 
                 CompleteProgressWindow(true);
                 
@@ -224,14 +305,29 @@ private:
                 msg << "Browser Sanity has been successfully installed!\n\nThe application will now launch from Program Files.";
                 msg.show();
                 
-                LaunchInstalledVersion();
-                nana::API::exit_all();
+                LaunchInstalledApplication();
+                ExitApplication();
             } else {
                 CompleteProgressWindow(false);
                 
+                // Get the last error code and message
+                DWORD errorCode = GetLastError();
+                char errorMessage[1024] = {0};
+                FormatMessageA(
+                    FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                    NULL,
+                    errorCode,
+                    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                    errorMessage,
+                    sizeof(errorMessage),
+                    NULL
+                );
+                
+                DebugLogError("Installation failed with error code %lu: %s", errorCode, errorMessage);
+                
                 nana::msgbox msg(installerForm, "Installation Failed");
                 msg.icon(nana::msgbox::icon_error);
-                msg << "Failed to install Browser Sanity. Please check the logs for details.";
+                msg << "Failed to install Browser Sanity.\n\nError code: " << errorCode << "\n" << errorMessage << "\n\nPlease check the logs for details.";
                 msg.show();
             }
         } catch (const std::exception& e) {
@@ -245,7 +341,6 @@ private:
     }
     
     void LaunchInstalledVersion() {
-        // TODO: Launch the installed version from Program Files
-        // This would typically involve ShellExecute to the installed location
+        LaunchInstalledApplication();
     }
 };

@@ -95,10 +95,45 @@ Based on original project specification, the application provides these windows:
 
 ### Actions Directory (`src/browser-sanity/actions/`)
 Modular action implementations following the pattern `action_{name}.c`:
+
 - `action_install.c` - Application installation logic
-- `action_uninstall.c` - Application removal logic  
-- `action_resources.c` - Resource extraction (msedge binary)
+  - Handles the complete installation process of Browser Sanity
+  - Creates installation directory in Program Files
+  - Copies executable to installation location
+  - Creates desktop and start menu shortcuts
+  - Updates application configuration in registry
+  - Installs the msedge.exe redirector
+  - Handles privilege elevation for administrative tasks
+  - Launches the installed application after successful installation
+
+- `action_uninstall.c` - Application removal logic
+  - Performs complete uninstallation of Browser Sanity
+  - Removes the msedge.exe redirector
+  - Disables startup configuration
+  - Removes desktop and start menu shortcuts
+  - Deletes registry entries
+  - Uses a self-deletion mechanism for removing installation files
+  - Handles privilege elevation for administrative tasks
+
+- `action_resources.c` - Resource extraction utilities
+  - Extracts embedded msedge.exe binary from application resources
+  - Handles resource loading and writing to disk
+  - Manages Windows resource APIs for binary extraction
+
 - `action_watchdog.c` - Background monitoring service
+  - Implements the watchdog mode of the application
+  - Reads configuration to determine if watchdog is enabled
+  - Starts the watchdog monitoring service
+  - Maintains a Windows message loop for the watchdog process
+
+### Watchdog Implementation (`src/browser-sanity/watchdog/`)
+
+- `watchdog.c` - Core watchdog functionality
+  - Implements a background thread that monitors the msedge.exe redirector
+  - Periodically checks if the redirector has been tampered with or removed
+  - Shows toast notifications when tampering is detected
+  - Automatically repairs the redirector when necessary
+  - Provides functions to start, stop, and configure the watchdog service
 
 ### Development Principles
 - **Single Responsibility**: Each window handles one specific purpose

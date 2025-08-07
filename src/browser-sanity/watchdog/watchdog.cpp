@@ -1,5 +1,5 @@
 /**
- * @file watchdog.c
+ * @file watchdog.cpp
  * @brief Implementation of the watchdog functionality
  */
 

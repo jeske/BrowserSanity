@@ -1,15 +1,15 @@
 /**
- * @file action_watchdog.c
+ * @file action_watchdog.cpp
  * @brief Watchdog action implementation
  */
 
 #include <browser_sanity.h>
 #include <windows.h>
 
-// External functions from watchdog.c
-extern BOOL StartWatchdog();
-extern BOOL StopWatchdog();
-extern BOOL IsWatchdogRunning();
+// External functions from watchdog.cpp
+BOOL StartWatchdog();
+BOOL StopWatchdog();
+BOOL IsWatchdogRunning();
 
 /**
  * @brief Runs the application in watchdog mode
