@@ -17,8 +17,10 @@ static LRESULT CALLBACK ManualLaunchWndProc(HWND hWnd, UINT uMsg, WPARAM wParam,
                     ExitProcess(0);
                     return 0;
                 case IDCANCEL: // Uninstall button
-                    // TODO: Launch uninstall process and then exit
-                    ExitProcess(0);
+                    // Hide this dialog and start uninstall progress
+                    ShowWindow(hWnd, SW_HIDE);
+                    ShowInstallUninstallProgressDialog(hWnd, FALSE); // FALSE = uninstall
+                    // Progress dialog will handle ExitProcess when closed
                     return 0;
                 case IDNO: // Exit button
                     ExitProcess(0);
@@ -138,15 +140,17 @@ int ShowManualLaunchDialog(HWND hwndParent, BOOL isRunning, BOOL isInstalled, DW
     int clientWidth = clientRect.right - clientRect.left;
     int clientHeight = clientRect.bottom - clientRect.top;
     
-    // Create buttons (positioned from right to left in lower right of client area)
+    // Create Show Settings button on left side (disabled if not running)
+    HWND hShowSettings = CreateWindow("BUTTON", "Show Settings", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        20, clientHeight - 40, 95, 25, hDlg, (HMENU)IDYES, GetModuleHandle(NULL), NULL);
+    EnableWindow(hShowSettings, isRunning); // Disable if process not running
+    
+    // Create action buttons in lower right
     HWND hExit = CreateWindow("BUTTON", "Exit", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         clientWidth - 80, clientHeight - 40, 70, 25, hDlg, (HMENU)IDNO, GetModuleHandle(NULL), NULL);
         
     HWND hUninstall = CreateWindow("BUTTON", "Uninstall", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         clientWidth - 160, clientHeight - 40, 75, 25, hDlg, (HMENU)IDCANCEL, GetModuleHandle(NULL), NULL);
-        
-    HWND hShowSettings = CreateWindow("BUTTON", "Show Settings", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        clientWidth - 260, clientHeight - 40, 95, 25, hDlg, (HMENU)IDYES, GetModuleHandle(NULL), NULL);
     
     // Set fonts
     HFONT hMainFont = CreateFont(16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,

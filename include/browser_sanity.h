@@ -205,4 +205,13 @@ int ShowManualLaunchDialog(HWND hwndParent, BOOL isRunning, BOOL isInstalled, DW
  */
 int ShowMainSettingsDialog(HWND hwndParent);
 
+/**
+ * @brief Shows the install/uninstall progress dialog
+ *
+ * @param hwndParent Parent window handle
+ * @param isInstall TRUE for install, FALSE for uninstall
+ * @return Dialog result
+ */
+int ShowInstallUninstallProgressDialog(HWND hwndParent, BOOL isInstall);
+
 #endif /* BROWSER_SANITY_H */
