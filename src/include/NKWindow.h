@@ -41,7 +41,7 @@ public:
     virtual ~NKWindow();
     
     // Window management
-    bool CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const wchar_t* className, int x, int y);
+    bool CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const char* className, int x, int y);
     void ShowWindow(int nCmdShow = SW_SHOW);
     void HideWindow();
     void DestroyWindow();

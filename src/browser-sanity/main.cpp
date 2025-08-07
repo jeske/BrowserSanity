@@ -8,6 +8,18 @@
  * content targeting in Nuklear applications. The key breakthrough is processing
  * each window individually with immediate command processing.
  *
+ * STRING ENCODING NOTICE:
+ * This application uses ANSI 8-bit strings throughout for simplicity and compatibility
+ * with the MultiByte character set configuration. All Windows API calls use the 'A'
+ * versions (CreateWindowExA, SetWindowTextA, etc.) to match this encoding.
+ *
+ * TODO: Switch to double-byte Windows-standard Unicode (UTF-16) when implementing
+ *       international language translations. This will require:
+ *       - Changing project CharacterSet to Unicode in BrowserSanity.vcxproj
+ *       - Converting all string literals to L"wide strings"
+ *       - Using 'W' versions of Windows API calls (CreateWindowExW, etc.)
+ *       - Updating all char* parameters to wchar_t* throughout the codebase
+ *
  * KEY SUCCESS PRINCIPLES IMPLEMENTED:
  * 1. Process ALL pending Windows messages before calling UpdateAll()
  * 2. Single shared nk_context for all windows (Nuklear's intended design)
@@ -38,6 +50,7 @@
 #include <browser_sanity.h>
 #include <main.h>
 #include <debug_log.h>
+#include <resource.h>
 #include <memory>
 
 // Global application state definition
@@ -48,40 +61,49 @@ extern "C" NKWindow* CreateMainLaunchWindow(NKWindowManager& windowManager);
 extern "C" NKWindow* CreateSettingsWindow(NKWindowManager& windowManager);
 extern "C" NKWindow* CreateToastWindow(NKWindowManager& windowManager);
 
-// Window class names
-#define MAIN_WINDOW_CLASS L"BrowserSanityMainWindow"
-#define SETTINGS_WINDOW_CLASS L"BrowserSanitySettingsWindow"
-#define TOAST_WINDOW_CLASS L"BrowserSanityToastWindow"
+// Window class names (ANSI strings for MultiByte character set)
+#define MAIN_WINDOW_CLASS "BrowserSanityMainWindow"
+#define SETTINGS_WINDOW_CLASS "BrowserSanitySettingsWindow"
+#define TOAST_WINDOW_CLASS "BrowserSanityToastWindow"
 
 // Register window classes
 bool RegisterWindowClasses(HINSTANCE hInstance) {
-    // Main window class
-    WNDCLASSEXW main_wc = {0};
-    main_wc.cbSize = sizeof(WNDCLASSEXW);
+    // Load the application icon
+    HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+    if (!hIcon) {
+        // Fallback to default application icon if our icon fails to load
+        hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    }
+    
+    // Main window class (using ANSI version for MultiByte character set)
+    WNDCLASSEXA main_wc = {0};
+    main_wc.cbSize = sizeof(WNDCLASSEXA);
     main_wc.style = CS_HREDRAW | CS_VREDRAW;
     main_wc.lpfnWndProc = NKWindowProc;
     main_wc.hInstance = hInstance;
+    main_wc.hIcon = hIcon;
+    main_wc.hIconSm = hIcon;
     main_wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     main_wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     main_wc.lpszClassName = MAIN_WINDOW_CLASS;
     
-    if (!RegisterClassExW(&main_wc)) {
+    if (!RegisterClassExA(&main_wc)) {
         return false;
     }
     
-    // Settings window class
-    WNDCLASSEXW settings_wc = main_wc;
+    // Settings window class (inherits icon from main_wc)
+    WNDCLASSEXA settings_wc = main_wc;
     settings_wc.lpszClassName = SETTINGS_WINDOW_CLASS;
     
-    if (!RegisterClassExW(&settings_wc)) {
+    if (!RegisterClassExA(&settings_wc)) {
         return false;
     }
     
-    // Toast window class
-    WNDCLASSEXW toast_wc = main_wc;
+    // Toast window class (inherits icon from main_wc)
+    WNDCLASSEXA toast_wc = main_wc;
     toast_wc.lpszClassName = TOAST_WINDOW_CLASS;
     
-    if (!RegisterClassExW(&toast_wc)) {
+    if (!RegisterClassExA(&toast_wc)) {
         return false;
     }
     

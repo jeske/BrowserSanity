@@ -42,21 +42,28 @@ NKWindow::~NKWindow() {
     m_windowManager.UnregisterWindow(this);
 }
 
-bool NKWindow::CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const wchar_t* className, int x, int y) {
-    // Convert title from std::string to wide string
-    std::wstring wideTitle;
-    wideTitle.assign(m_title.begin(), m_title.end());
+bool NKWindow::CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const char* className, int x, int y) {
+    // Use ANSI string for title to match project's MultiByte character set
+    const char* ansiTitle = "Browser Sanity - Test Window Title";
     
-    m_hwnd = CreateWindowExW(
+    DebugLog("CreateOSWindow: Creating window with title: %s", ansiTitle);
+    
+    m_hwnd = CreateWindowExA(
         0,
         className,
-        wideTitle.c_str(),
+        ansiTitle,
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         x, y, m_width, m_height,
         NULL, NULL, hInstance, NULL
     );
     
     if (m_hwnd) {
+        DebugLog("CreateOSWindow: Window created successfully, HWND: %p", m_hwnd);
+        
+        // Force set the window title again after creation
+        SetWindowTextA(m_hwnd, ansiTitle);
+        DebugLog("CreateOSWindow: Window title set again via SetWindowTextA");
+        
         RegisterWindowMapping(m_hwnd, this);
         
         // Create and register GDI backend with window manager
@@ -67,6 +74,8 @@ bool NKWindow::CreateOSWindow(HINSTANCE hInstance, WNDPROC wndProc, const wchar_
         m_active = true;
         OnCreate();
         return true;
+    } else {
+        DebugLogError("CreateOSWindow: Failed to create window, error: %lu", GetLastError());
     }
     return false;
 }
