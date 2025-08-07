@@ -41,7 +41,7 @@ inline void DebugLogWithLevel(DebugLevel level, const char* levelName, const cha
     GetLocalTime(&st);
     
     // Open log file for append
-    FILE* logFile = fopen("C:\\temp\\browsersanity.txt", "a");
+    FILE* logFile = fopen("C:\\temp\\browsersanity.log", "a");
     if (logFile) {
         // Write timestamp and level
         fprintf(logFile, "[%02d:%02d:%02d.%03d] [%s] ", 
@@ -86,7 +86,7 @@ inline void InitializeLogging() {
     CreateDirectoryA("C:\\temp", NULL);
     
     // Clear the log file
-    FILE* logFile = fopen("C:\\temp\\browsersanity.txt", "w");
+    FILE* logFile = fopen("C:\\temp\\browsersanity.log", "w");
     if (logFile) {
         fprintf(logFile, "=== Browser Sanity Debug Log Started ===\n");
         fclose(logFile);

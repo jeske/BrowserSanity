@@ -1,8 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo Browser Sanity Build Script
-echo ===========================
+echo Browser Sanity Build Script (Nana Version)
+echo ==========================================
 echo Using MSBuild for compilation
 echo.
 
@@ -74,7 +74,6 @@ echo Or download from: https://visualstudio.microsoft.com/downloads/
 echo.
 echo Make sure to install the "Desktop development with C++" workload
 echo.
-pause
 exit /b 1
 
 :setup_msvc_env
@@ -108,16 +107,27 @@ if %ERRORLEVEL% equ 0 (
     echo No BrowserSanity.exe processes found
 )
 echo.
-echo Building Browser Sanity solution...
+echo Building Browser Sanity solution (Nana version)...
 echo.
 
 REM Create build directory if it doesn't exist
 if not exist build mkdir build
 
-REM Build the solution using MSBuild
-msbuild BrowserSanity.sln /p:Configuration=Release /p:Platform=Win32 /m
+REM Build the Nana-based solution using MSBuild
+echo Building BrowserSanity_Nana.vcxproj...
+msbuild BrowserSanity_Nana.vcxproj /p:Configuration=Release /p:Platform=Win32 /m
 if %ERRORLEVEL% neq 0 (
     echo Build failed!
+    echo.
+    echo Common issues:
+    echo  - Missing C++ build tools
+    echo  - Missing Windows SDK
+    echo  - Nana library compilation errors
+    echo.
+    echo Try installing:
+    echo  - Visual Studio 2022 with "Desktop development with C++" workload
+    echo  - Windows 10/11 SDK
+    echo.
     exit /b 1
 )
 
@@ -126,7 +136,18 @@ echo Build completed successfully!
 echo.
 echo Output files:
 echo  * build-Release\msedge.exe
-echo  * build-Release\BrowserSanity.exe
+echo  * build-Release\BrowserSanity.exe (Nana version)
 echo.
+echo The new Nana-based version should have:
+echo  - No multi-window context issues
+echo  - Cleaner, more maintainable code
+echo  - Better DPI scaling
+echo  - More reliable event handling
+echo.
+
+REM Automatically run the application for development
+echo.
+echo Starting BrowserSanity.exe automatically...
+start "" "build-Release\BrowserSanity.exe"
 
 exit /b 0

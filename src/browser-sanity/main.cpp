@@ -273,6 +273,8 @@ extern "C" {
     
     // Function to exit application
     void ExitApplication() {
+        DebugLogInfo("ExitApplication() called - setting g_app.running = false");
         g_app.running = false;
+        DebugLogInfo("ExitApplication() completed - g_app.running is now: %s", g_app.running ? "true" : "false");
     }
 }

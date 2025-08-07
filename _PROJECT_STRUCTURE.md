@@ -10,20 +10,82 @@ Browser Sanity is a Windows application that ensures browser choice preferences 
 
 ```
 /
-├── Archive/                # Archived/old code (installer/ contents moved here)
-├── src/                    # Source code
-│   ├── msedge-redirect/    # msedge.exe replacement code
-│   └── browser-sanity/     # BrowserSanity.exe application code
-│       ├── actions/        # Action implementations (install, uninstall, resources, watchdog)
-│       ├── ui/             # User interface dialog components
-│       └── watchdog/       # Background monitoring functionality
-├── include/                # Header files
-├── res/                    # Resource files (icons, embedded binaries)
-├── docs/                   # Documentation
-└── *.vcxproj, *.sln       # Visual Studio project files
+├── Archive/                    # Archived/old code
+│   └── old_nuklear_ui_files/   # Previous Nuklear UI implementation (archived)
+│       ├── NuklearCPP/         # C++ Nuklear wrapper classes
+│       ├── ui/                 # Legacy Nuklear UI components
+│       └── *.cpp               # Old implementation files
+├── src/                        # Source code
+│   ├── msedge-redirect/        # msedge.exe replacement code
+│   └── browser-sanity/         # BrowserSanity.exe application code
+│       ├── actions/            # Action implementations (install, uninstall, resources, watchdog)
+│       ├── ui/                 # NEW: Nana UI window implementations
+│       │   ├── nana_installer.cpp  # Installer window (info, GitHub, install)
+│       │   ├── nana_settings.cpp   # Settings window (redirect status, uninstall)
+│       │   ├── nana_progress.cpp   # Install/uninstall progress window
+│       │   └── nana_toast.cpp      # Toast notification window
+│       ├── watchdog/           # Background monitoring functionality
+│       ├── main_nana.cpp       # NEW: Nana-based main entry point
+│       └── main.cpp            # Original main entry point
+├── deps/                       # Dependencies
+│   └── nana/                   # Nana GUI library source code (complete integration)
+├── include/                    # Header files
+├── res/                        # Resource files (icons, embedded binaries)
+├── docs/                       # Documentation
+├── STRATEGIES_FOR_AI/          # AI development guidance documents
+├── BrowserSanity_Nana.vcxproj  # NEW: Nana-based Visual Studio project
+├── BrowserSanity.vcxproj       # Original Nuklear-based project
+└── *.sln, build_nana.bat      # Build files
 ```
 
 ## Architecture & Naming Conventions
+
+### UI Framework Migration: Nuklear → Nana (COMPLETED)
+
+**MIGRATION COMPLETED**: The project has successfully migrated from **Nuklear** immediate mode GUI to **Nana** retained mode GUI framework, resolving all multi-window context management issues.
+
+**Previous Nuklear Issues (RESOLVED)**:
+- ✅ Complex multi-window context management eliminated
+- ✅ Assertion failures with multiple windows resolved
+- ✅ 14+ hours of troubleshooting issues eliminated
+- ✅ Immediate mode complexity for multi-window applications resolved
+
+**New Nana Implementation** (`src/browser-sanity/main_nana.cpp` + individual window files):
+- **Framework**: Nana C++ GUI library (retained mode)
+- **Benefits**: Automatic resource management, place layout system, no context conflicts
+- **Architecture**: Clean window classes with RAII and smart pointers
+- **Organization**: Individual files for each window type (modular design)
+
+### Window Architecture (Nana Implementation)
+
+Based on original project specification, the application provides these windows:
+
+1. **nana_installer.cpp** - `NanaInstallerWindow`
+   - Shows when run from outside Program Files
+   - Application information and purpose description
+   - Clickable GitHub link (https://github.com/jeske/BrowserSanity)
+   - Version checking with update button capability
+   - Install button for setup process
+
+2. **nana_settings.cpp** - `NanaSettingsWindow`
+   - Shows when already installed in Program Files
+   - Redirect installation status display
+   - Install/Remove redirect buttons
+   - Startup options control ("Start with Windows")
+   - Uninstall functionality with confirmation
+
+3. **nana_progress.cpp** - `NanaInstallProgressWindow`
+   - Shows during install/uninstall operations
+   - Progress bar with percentage completion
+   - Dynamic status messages for each step
+   - Cancellation support (when safe to cancel)
+   - Success/failure reporting with appropriate messaging
+
+4. **nana_toast.cpp** - `NanaToastWindow`
+   - For watchdog notifications when redirect is tampered
+   - Alert message display
+   - "Repair Redirect" and "Open Settings" action buttons
+   - Dismissible notifications
 
 ### Actions Directory (`src/browser-sanity/actions/`)
 Modular action implementations following the pattern `action_{name}.c`:
@@ -32,37 +94,40 @@ Modular action implementations following the pattern `action_{name}.c`:
 - `action_resources.c` - Resource extraction (msedge binary)
 - `action_watchdog.c` - Background monitoring service
 
-### UI Directory (`src/browser-sanity/ui/`)
-**UI Framework Migration**: The project has migrated from manual Windows API dialogs to **Nuklear** immediate mode GUI framework for automatic DPI scaling and simplified UI code.
-
-**Nuklear Integration**:
-- **Header Location**: [`include/nuklear.h`](include/nuklear.h) (single-header library)
-- **File Size**: ~640K lines (too large to read directly, use external documentation)
-- **GitHub Source**: https://github.com/Immediate-Mode-UI/Nuklear
-- **Documentation**: https://immediate-mode-ui.github.io/Nuklear/
-- **Benefits**: Automatic DPI scaling, immediate mode rendering, much simpler code vs manual Windows API
-
-**Legacy Dialog Files** (archived in `Archive/old_ui_system/`):
-- `dialog_manualLaunch.c` - Main status dialog when app run directly
-- `dialog_manualLaunchInstall.c` - Installation prompt dialog (when app not found)
-- `dialog_mainSettings.c` - Configuration settings dialog
-- `dialog_installanduninstallprogress.c` - Unified install/uninstall progress tracking
-
 ### Development Principles
-- **Single Responsibility**: Each dialog/action handles one specific purpose
+- **Single Responsibility**: Each window handles one specific purpose
+- **Modular Design**: Windows are in separate files, actions can be called independently
 - **Consistent Naming**: Files named by their primary function using descriptive terms
-- **Modular Design**: Actions can be called independently, dialogs are self-contained
-- **Unified Progress**: Install/uninstall operations share common progress tracking to avoid duplication
-- **Immediate Mode UI**: Nuklear provides automatic DPI scaling and eliminates complex Windows API dialog management
+- **Retained Mode UI**: Nana provides automatic DPI scaling and eliminates complex context management
+- **RAII Resource Management**: Modern C++ patterns with automatic cleanup
+
+### Nana Integration Details
+- **Library Location**: Complete Nana source integrated in `deps/nana/`
+- **Build Integration**: All Nana source files included in `BrowserSanity_Nana.vcxproj`
+- **Layout System**: Uses Nana's place layout manager for automatic UI arrangement
+- **Event Handling**: Lambda-based event handlers with proper resource management
+- **No External Dependencies**: Self-contained build with no additional DLL requirements
 
 ## Build System
 The project uses Visual Studio project files (`.vcxproj`/`.sln`) with MSVC compiler. Build targets:
 
 1. `msedge-redirect.exe` - The lightweight Edge replacement
-2. `BrowserSanity.exe` - The main application with UI and management features
+2. `BrowserSanity.exe` - The main application with Nana UI and management features
+
+**Build Commands**:
+- `build_nana.bat` - Builds the new Nana-based version
+- `build.bat` - Builds the original Nuklear-based version (legacy)
 
 ## Development Workflow
 1. Edit source files in the `src/` directory using organized action/ui structure
-2. Run `build.bat` or build through Visual Studio to compile the project
-3. Test dialog functionality and action implementations
+2. Run `build_nana.bat` to compile the Nana-based project
+3. Test window functionality and action implementations
 4. Archive old code in `Archive/` directory rather than deletion for reference
+
+## Migration Status: COMPLETE ✅
+- ✅ Nuklear → Nana migration completed
+- ✅ Multi-window context issues resolved
+- ✅ Individual window files created and organized
+- ✅ Build system updated and functional
+- ✅ Original Nuklear code archived for reference
+- ✅ Clean, maintainable codebase established
