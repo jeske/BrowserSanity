@@ -24,6 +24,11 @@ extern "C" {
     #include <resource.h>
 }
 
+// Forward declaration for progress window access
+extern void ShowProgressWindow(bool isInstall);
+extern void UpdateProgressWindow(int percentage, const char* status);
+extern void CompleteProgressWindow(bool success);
+
 class NanaInstallerWindow {
 private:
     nana::form installerForm;
@@ -134,21 +139,9 @@ private:
         });
         
         installButton.events().click([this]() {
-            if (PerformInstallation()) {
-                nana::msgbox msg(installerForm, "Installation Complete");
-                msg.icon(nana::msgbox::icon_information);
-                msg << "Browser Sanity has been successfully installed!\n\nThe application will now launch from Program Files.";
-                msg.show();
-                
-                // Launch installed version and exit
-                LaunchInstalledVersion();
-                nana::API::exit_all();
-            } else {
-                nana::msgbox msg(installerForm, "Installation Failed");
-                msg.icon(nana::msgbox::icon_error);
-                msg << "Failed to install Browser Sanity. Please check the logs for details.";
-                msg.show();
-            }
+            // Show progress window and start installation
+            ShowProgressWindow(true); // true = installation
+            PerformInstallationWithProgress();
         });
         
         exitButton.events().click([this]() {
@@ -167,9 +160,62 @@ private:
         updateButton.enabled(updateAvailable);
     }
     
-    bool PerformInstallation() {
-        // Call the C installation function
-        return InstallApplication();
+    void PerformInstallationWithProgress() {
+        // Start installation process with progress updates
+        std::thread([this]() {
+            try {
+                UpdateProgressWindow(10, "Preparing installation...");
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                
+                UpdateProgressWindow(25, "Checking system requirements...");
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                
+                UpdateProgressWindow(40, "Creating program directories...");
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                
+                UpdateProgressWindow(60, "Installing application files...");
+                bool installResult = InstallApplication();
+                
+                if (installResult) {
+                    UpdateProgressWindow(80, "Configuring startup settings...");
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    
+                    UpdateProgressWindow(95, "Finalizing installation...");
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    
+                    CompleteProgressWindow(true);
+                    
+                    // Show completion message and exit
+                    nana::API::post_quit_guard([this]() {
+                        nana::msgbox msg(installerForm, "Installation Complete");
+                        msg.icon(nana::msgbox::icon_information);
+                        msg << "Browser Sanity has been successfully installed!\n\nThe application will now launch from Program Files.";
+                        msg.show();
+                        
+                        LaunchInstalledVersion();
+                        nana::API::exit_all();
+                    });
+                } else {
+                    CompleteProgressWindow(false);
+                    
+                    nana::API::post_quit_guard([this]() {
+                        nana::msgbox msg(installerForm, "Installation Failed");
+                        msg.icon(nana::msgbox::icon_error);
+                        msg << "Failed to install Browser Sanity. Please check the logs for details.";
+                        msg.show();
+                    });
+                }
+            } catch (const std::exception& e) {
+                CompleteProgressWindow(false);
+                
+                nana::API::post_quit_guard([this, e]() {
+                    nana::msgbox msg(installerForm, "Installation Error");
+                    msg.icon(nana::msgbox::icon_error);
+                    msg << "Installation failed with error: " << e.what();
+                    msg.show();
+                });
+            }
+        }).detach();
     }
     
     void LaunchInstalledVersion() {
